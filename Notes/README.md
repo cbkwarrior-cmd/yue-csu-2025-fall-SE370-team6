@@ -1,0 +1,1 @@
+This folder is to keep all the notes or related artifacts to share with your team.
