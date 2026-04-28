@@ -1,3 +1,5 @@
+package org.DisneylandMap;
+
 import java.util.ArrayList;
 
 public class MapNode {

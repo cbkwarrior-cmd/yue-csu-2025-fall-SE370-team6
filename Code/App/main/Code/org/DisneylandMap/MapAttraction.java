@@ -1,4 +1,6 @@
-public class MapAttraction extends MapNode{
+package org.DisneylandMap;
+
+public class MapAttraction extends MapNode {
     private String name;
     private int attractionID, landID;
 
