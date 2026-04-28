@@ -5,16 +5,24 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.PriorityQueue;
 import java.util.function.BiConsumer;
 
 import javax.imageio.ImageIO;
 
 public class MapController {
+    private final double STEPS_PER_METER = 1.31;
+    private final double STEPS_PER_SECOND = 1.5;
+
     private Map map;
 
     // Key-value pairs of [attractionID : index into map's list of nodes]
     private HashMap<Integer, Integer> attractionsTable = new HashMap<>();
+
+    private double pathDistance;
+    private double pathETA;
 
     public MapController() {
     }
@@ -42,6 +50,9 @@ public class MapController {
                 while(!(ln = nodesReader.readLine()).contains("|")) {
                     node.getDistances().add(Double.parseDouble(ln));
                 }
+                while(!(ln = nodesReader.readLine()).contains("|")) {
+                    node.getConnectionTypes().add(Integer.parseInt(ln));
+                }
 
                 nodes.add(node);
                 if(attractionID != -1) {
@@ -60,7 +71,57 @@ public class MapController {
     }
 
     public ArrayList<Point.Double> findPath(int startID, int endID) {
-        return new ArrayList<>();
+        // Implementation of Dijkstra's algorithm sourced from: https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm
+
+        int sourceIndex = attractionsTable.get(startID);
+        int endIndex = attractionsTable.get(endID);
+        ArrayList<Point.Double> path = new ArrayList<>();
+
+        double[] dist = new double[map.getNodes().size()];
+        double[] eta = new double[map.getNodes().size()];
+        int[] prev = new int[map.getNodes().size()];
+        PriorityQueue<Integer> Q = new PriorityQueue<>((a, b) -> Double.compare(dist[a], dist[b]));
+
+        for(int i = 0; i < map.getNodes().size(); i++) {
+            dist[i] = Double.MAX_VALUE;
+            eta[i] = 0;
+            prev[i] = -1;
+        }
+        dist[sourceIndex] = 0;
+        // I believe I can get away with this?
+        Q.add(sourceIndex);
+
+        while (!Q.isEmpty()) {
+            int u = Q.poll();
+            if (dist[u] == Double.MAX_VALUE) { continue; }
+            if (u == endIndex) { break; }
+
+            MapNode node = map.getNodes().get(u);
+
+            for (int i = 0; i < node.getConnections().size(); i++) {
+                int v = node.getConnections().get(i);
+
+                double d = node.getDistances().get(i);
+                double alt = dist[u] + d;
+                if (alt < dist[v]) {
+                    dist[v] = alt;
+                    eta[v] = eta[u] + (d * STEPS_PER_METER) / STEPS_PER_SECOND;
+                    prev[v] = u;
+                    Q.add(v);
+                }
+            }
+        }
+
+        for (int i = endIndex; i != -1; i = prev[i]) {
+            MapNode node = map.getNodes().get(i);
+            path.add(new Point.Double(node.getX(), node.getY()));
+        }
+
+        pathDistance = dist[endIndex];
+        pathETA = eta[endIndex];
+
+        Collections.reverse(path);
+        return path;
     }
 
     public void forEachAttraction(BiConsumer<Integer, MapNode> action) {
@@ -84,5 +145,13 @@ public class MapController {
 
     public BufferedImage getMapImage() {
         return map.getMapImage();
+    }
+
+    public double getPathDistance() {
+        return pathDistance;
+    }
+
+    public double getPathETA() {
+        return pathETA;
     }
 }

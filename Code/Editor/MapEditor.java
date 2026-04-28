@@ -40,6 +40,9 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
 
     final String NODES_FILE_NAME = "nodes.txt";
 
+    final double PARK_WIDTH_IN_METERS = 1200;
+    final double PARK_HEIGHT_IN_METERS = 800;
+
     static double cameraX = 0, cameraY = 0;
     static double scale = 1.0;
 
@@ -49,6 +52,12 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
     static int mouseX, mouseY;
     static boolean lmbDown;
 
+    static final int CONNECTION_TYPE_WALKWAY = 0;
+    static final int CONNECTION_TYPE_TRAIN = 1;
+    static final int CONNECTION_TYPE_PARADE = 2;
+
+    static int connectionType = CONNECTION_TYPE_WALKWAY;
+
     private class Node {
         public int attractionID;
         public int landID;
@@ -56,6 +65,7 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
         public String name;
         public ArrayList<Integer> connections;
         public ArrayList<Double> distances;
+        public ArrayList<Integer> connectionTypes;
     }
     static ArrayList<Node> nodes = new ArrayList<>();
 
@@ -90,19 +100,19 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
 
     static int pointAIndex = -1;
 
-    private int world_to_pixel_x(double x) {
+    private int worldToPixelX(double x) {
         return (int)((x + .5 - cameraX) * WINDOW_WIDTH * scale);
     }
 
-    private int world_to_pixel_y(double y) {
+    private int worldToPixelY(double y) {
         return (int)((y + .5 - cameraY) * WINDOW_HEIGHT * scale);
     }
 
-    private double pixel_to_world_x(int x) {
+    private double pixelToWorldX(int x) {
         return cameraX + ((double)x / WINDOW_WIDTH - .5) / scale;
     }
 
-    private double pixel_to_world_y(int y) {
+    private double pixelToWorldY(int y) {
         return cameraY + ((double)y / WINDOW_HEIGHT - .5) / scale;
     }
 
@@ -110,18 +120,19 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
         Node n = new Node();
         n.attractionID = -1;
         n.landID = -1;
-        n.x = pixel_to_world_x(mouseX);
-        n.y = pixel_to_world_y(mouseY);
+        n.x = pixelToWorldX(mouseX);
+        n.y = pixelToWorldY(mouseY);
         n.name = "";
         n.connections = new ArrayList<>();
         n.distances = new ArrayList<>();
+        n.connectionTypes = new ArrayList<>();
         nodes.add(n);
     }
 
     private void tracePath(int pointB) {
         double dx = nodes.get(pointB).x - nodes.get(pointAIndex).x;
         double dy = nodes.get(pointB).y - nodes.get(pointAIndex).y;
-        double dist = Math.hypot(dx, dy);
+        double dist = Math.hypot(dx * PARK_WIDTH_IN_METERS, dy * PARK_HEIGHT_IN_METERS);
 
         nodes.get(pointB).connections.add(pointAIndex);
         nodes.get(pointAIndex).connections.add(pointB);
@@ -129,13 +140,16 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
         nodes.get(pointB).distances.add(dist);
         nodes.get(pointAIndex).distances.add(dist);
 
+        nodes.get(pointB).connectionTypes.add(connectionType);
+        nodes.get(pointAIndex).connectionTypes.add(connectionType);
+
         pointAIndex = pointB;
     }
 
     public void mousePressed(MouseEvent e) {
         if(SwingUtilities.isRightMouseButton(e)) {
-            dragXStart = pixel_to_world_x(e.getX());
-            dragYStart = pixel_to_world_y(e.getY());
+            dragXStart = pixelToWorldX(e.getX());
+            dragYStart = pixelToWorldY(e.getY());
             dragging = true;
         }
         else if(SwingUtilities.isLeftMouseButton(e) && !dataPanel.isEnabled()) {
@@ -157,8 +171,8 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
     public void mouseDragged(MouseEvent e) {
         if(dragging) {
             double bounds = -1.0 / (scale * 2.0);
-            cameraX = Math.clamp(dragXStart + cameraX - pixel_to_world_x(e.getX()), bounds, (1.0 + bounds));
-            cameraY = Math.clamp(dragYStart + cameraY - pixel_to_world_y(e.getY()), bounds, (1.0 + bounds));
+            cameraX = Math.clamp(dragXStart + cameraX - pixelToWorldX(e.getX()), bounds, (1.0 + bounds));
+            cameraY = Math.clamp(dragYStart + cameraY - pixelToWorldY(e.getY()), bounds, (1.0 + bounds));
             repaint();
         }
     }
@@ -187,8 +201,21 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
         if(dataPanel.isEnabled() || pointAIndex != -1) { return; }
 
         switch(e.getKeyCode()) {
-            case KeyEvent.VK_1: editorMode = EditorMode.MODE_ATTRACTION_PLACE; break;
-            case KeyEvent.VK_2: editorMode = EditorMode.MODE_PATH_DRAW;        break;
+            case KeyEvent.VK_1: {
+                editorMode = EditorMode.MODE_ATTRACTION_PLACE;
+            } break;
+            case KeyEvent.VK_2: {
+                editorMode = EditorMode.MODE_PATH_DRAW;
+                connectionType = CONNECTION_TYPE_WALKWAY;
+            } break;
+            case KeyEvent.VK_3: {
+                editorMode = EditorMode.MODE_PATH_DRAW;
+                connectionType = CONNECTION_TYPE_TRAIN;
+            } break;
+            case KeyEvent.VK_4: {
+                editorMode = EditorMode.MODE_PATH_DRAW;
+                connectionType = CONNECTION_TYPE_PARADE;
+            } break;
             case KeyEvent.VK_Z: {
                 if(undoStack.isEmpty()) { break; }
                 switch(EditorMode.fromCode(undoStack.pop())) {
@@ -226,6 +253,10 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
                             wr.write("" + d + "\n");
                         }
                         wr.write("|\n");
+                        for (Integer t : node.connectionTypes) {
+                            wr.write("" + t + "\n");
+                        }
+                        wr.write("|\n");
                     }
                     wr.close();
                 }
@@ -253,8 +284,20 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
                 modeLabel.setForeground(Color.GREEN);
             } break;
             case MODE_PATH_DRAW: {
-                modeLabel.setText("MODE: Path Draw");
-                modeLabel.setForeground(Color.BLUE);
+                switch(connectionType) {
+                    case CONNECTION_TYPE_WALKWAY: {
+                        modeLabel.setText("MODE: Walkway Draw");
+                        modeLabel.setForeground(Color.BLUE);
+                    } break;
+                    case CONNECTION_TYPE_TRAIN: {
+                        modeLabel.setText("MODE: Train Draw");
+                        modeLabel.setForeground(Color.RED);
+                    } break;
+                    case CONNECTION_TYPE_PARADE: {
+                        modeLabel.setText("MODE: Parade Draw");
+                        modeLabel.setForeground(Color.CYAN);
+                    } break;
+                }
             } break;
         }
     }
@@ -276,7 +319,7 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D)g;
 
-        g2.drawImage(mapImage, world_to_pixel_x(-.5), world_to_pixel_y(-.5), (int)(WINDOW_WIDTH * scale), (int)(WINDOW_HEIGHT * scale), null);
+        g2.drawImage(mapImage, worldToPixelX(-.5), worldToPixelY(-.5), (int)(WINDOW_WIDTH * scale), (int)(WINDOW_HEIGHT * scale), null);
 
         boolean nodeClicked = false;
 
@@ -284,17 +327,24 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
             Node node = nodes.get(i);
 
             int diameter = (int)(20 * scale), radius = diameter / 2;
-            int x = world_to_pixel_x(node.x);
-            int y = world_to_pixel_y(node.y);
+            int x = worldToPixelX(node.x);
+            int y = worldToPixelY(node.y);
 
-            g2.setColor(Color.BLUE);
-            for(int dest_index : node.connections) {
+            for(int j = 0; j < node.connections.size(); j++) {
+                switch(node.connectionTypes.get(j)) {
+                    case CONNECTION_TYPE_WALKWAY: g.setColor(Color.BLUE); break;
+                    case CONNECTION_TYPE_TRAIN:   g.setColor(Color.RED);  break;
+                    case CONNECTION_TYPE_PARADE:  g.setColor(Color.CYAN); break;
+                }
+
+                int destIndex = node.connections.get(j);
+
                 float width = 3f;
                 BasicStroke stroke = new BasicStroke(width);
                 g2.setStroke(stroke);
 
-                Node dest = nodes.get(dest_index);
-                g2.drawLine(x, y, world_to_pixel_x(dest.x), world_to_pixel_y(dest.y));
+                Node dest = nodes.get(destIndex);
+                g2.drawLine(x, y, worldToPixelX(dest.x), worldToPixelY(dest.y));
             }
 
             if(node.attractionID == -1) {
@@ -366,6 +416,10 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
                 n.distances = new ArrayList<>();
                 while(!(ln = r.readLine()).contains("|")) {
                     n.distances.add(Double.parseDouble(ln));
+                }
+                n.connectionTypes = new ArrayList<>();
+                while(!(ln = r.readLine()).contains("|")) {
+                    n.connectionTypes.add(Integer.parseInt(ln));
                 }
                 nodes.add(n);
             }
