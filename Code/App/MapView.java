@@ -71,19 +71,19 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         unhighlightAttraction();
     }
 
-    private int world_to_pixel_x(double x) {
+    private int worldToPixelX(double x) {
         return MAP_X + (int)((x + .5 - cameraX) * MAP_WIDTH * scale);
     }
 
-    private int world_to_pixel_y(double y) {
+    private int worldToPixelY(double y) {
         return MAP_Y + (int)((y + .5 - cameraY) * MAP_HEIGHT * scale);
     }
 
-    private double pixel_to_world_x(int x) {
+    private double pixelToWorldX(int x) {
         return cameraX + ((double)(x - MAP_X) / MAP_WIDTH - .5) / scale;
     }
 
-    private double pixel_to_world_y(int y) {
+    private double pixelToWorldY(int y) {
         return cameraY + ((double)(y - MAP_Y) / MAP_HEIGHT - .5) / scale;
     }
 
@@ -167,8 +167,8 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
 
     public void mousePressed(MouseEvent e) {
         if(SwingUtilities.isRightMouseButton(e) && e.getX() >= MAP_X && e.getY() < MAP_HEIGHT) {
-            this.dragXStart = pixel_to_world_x(e.getX());
-            this.dragYStart = pixel_to_world_y(e.getY());
+            this.dragXStart = pixelToWorldX(e.getX());
+            this.dragYStart = pixelToWorldY(e.getY());
             this.dragging = true;
         }
         else if(SwingUtilities.isLeftMouseButton(e)) {
@@ -188,8 +188,8 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
     public void mouseDragged(MouseEvent e) {
         if(dragging) {
             double bounds = -1.0 / (scale * 2.0);
-            this.cameraX = Math.clamp(dragXStart + cameraX - pixel_to_world_x(e.getX()), bounds, (1.0 + bounds));
-            this.cameraY = Math.clamp(dragYStart + cameraY - pixel_to_world_y(e.getY()), bounds, (1.0 + bounds));
+            this.cameraX = Math.clamp(dragXStart + cameraX - pixelToWorldX(e.getX()), bounds, (1.0 + bounds));
+            this.cameraY = Math.clamp(dragYStart + cameraY - pixelToWorldY(e.getY()), bounds, (1.0 + bounds));
             repaint();
         }
     }
@@ -228,7 +228,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D)g;
 
-        g2.drawImage(controller.getMapImage(), world_to_pixel_x(-.5), world_to_pixel_y(-.5), (int)(MAP_WIDTH * scale), (int)(MAP_HEIGHT * scale), null);
+        g2.drawImage(controller.getMapImage(), worldToPixelX(-.5), worldToPixelY(-.5), (int)(MAP_WIDTH * scale), (int)(MAP_HEIGHT * scale), null);
 
         drawNodes(g2);
         drawPath(g2);
@@ -243,8 +243,8 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
     private void drawNodes(Graphics2D g) {
         controller.forEachAttraction((id, node) -> {
             final int DIAMETER = (int)(20 * scale), RADIUS = DIAMETER / 2;
-            int x = world_to_pixel_x(node.getX());
-            int y = world_to_pixel_y(node.getY());
+            int x = worldToPixelX(node.getX());
+            int y = worldToPixelY(node.getY());
 
             if(x < MAP_X - DIAMETER || x >= MAP_X + MAP_WIDTH + DIAMETER || y < MAP_Y - DIAMETER || y >= MAP_Y + MAP_HEIGHT + DIAMETER) {
                 return;
@@ -273,7 +273,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
 
             for (int i = 0; i < path.size() - 1; i++) {
                 Point.Double p0 = path.get(i), p1 = path.get(i + 1);
-                g.drawLine(world_to_pixel_x(p0.x), world_to_pixel_y(p0.y), world_to_pixel_x(p1.x), world_to_pixel_y(p1.y));
+                g.drawLine(worldToPixelX(p0.x), worldToPixelY(p0.y), worldToPixelX(p1.x), worldToPixelY(p1.y));
             }
         }
     }
