@@ -42,7 +42,16 @@ public class MapController {
                 double x = Double.parseDouble(nodesReader.readLine());
                 double y = Double.parseDouble(nodesReader.readLine());
 
-                MapNode node = new MapNode(name, attractionID, landID, x, y);
+                MapNode node;
+
+                if(attractionID == -1) {
+                    node = new MapNode(x, y);
+                }
+                else {
+                    node = new MapAttraction(name, attractionID, landID, x, y);
+                    attractionsTable.put(attractionID, nodes.size());
+                    System.out.println("" + attractionID + " " + (nodes.size()));
+                }
 
                 while(!(ln = nodesReader.readLine()).contains("|")) {
                     node.getConnections().add(Integer.parseInt(ln));
@@ -55,10 +64,6 @@ public class MapController {
                 }
 
                 nodes.add(node);
-                if(attractionID != -1) {
-                    attractionsTable.put(attractionID, nodes.size() - 1);
-                    System.out.println("" + attractionID + " " + (nodes.size() - 1));
-                }
             }
 
             nodesReader.close();
@@ -124,14 +129,14 @@ public class MapController {
         return path;
     }
 
-    public void forEachAttraction(BiConsumer<Integer, MapNode> action) {
+    public void forEachAttraction(BiConsumer<Integer, MapAttraction> action) {
         for(java.util.Map.Entry<Integer, Integer> e : attractionsTable.entrySet()) {
-            action.accept(e.getKey(), map.getNodes().get(e.getValue()));
+            action.accept(e.getKey(), (MapAttraction)map.getNodes().get(e.getValue()));
         }
     }
 
-    public MapNode getAttractionFromID(int id) {
-        return map.getNodes().get(attractionsTable.get(id));
+    public MapAttraction getAttractionFromID(int id) {
+        return (MapAttraction)map.getNodes().get(attractionsTable.get(id));
     }
 
     // Note for Morgan: Here are the methods to put your code into.
