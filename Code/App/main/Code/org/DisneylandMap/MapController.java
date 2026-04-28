@@ -1,3 +1,5 @@
+package org.DisneylandMap;
+
 import java.awt.Point;
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
@@ -23,6 +25,9 @@ public class MapController {
 
     private double pathDistance;
     private double pathETA;
+
+    //initializes the adaptor of the Queue-Times API
+    public IQueueTime adaptor = new QueueTimesAdaptor();
 
     public MapController() {
     }
@@ -141,12 +146,11 @@ public class MapController {
 
     // Note for Morgan: Here are the methods to put your code into.
     // If this isn't structured how you'd want it to be, change it.
-    public int getAttractionWaitTime(MapNode node) {
-        return 0;
+    public int getAttractionWaitTime(MapAttraction attraction) throws IOException, InterruptedException {
+
+        return adaptor.getWaitTime(attraction.getLandID(), attraction.getAttractionID());
     }
 
-    public void fetchFromHTTP() {
-    }
 
     public BufferedImage getMapImage() {
         return map.getMapImage();

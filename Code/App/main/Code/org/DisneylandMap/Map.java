@@ -1,3 +1,5 @@
+package org.DisneylandMap;
+
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 

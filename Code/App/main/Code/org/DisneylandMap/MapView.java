@@ -1,3 +1,5 @@
+package org.DisneylandMap;
+
 import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -160,6 +162,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         if (uiState == UIState.SELECT_POINT_B && highlightedAttractionID != id) {
             path = controller.findPath(highlightedAttractionID, id);
             setUiState(UIState.SHOW_PATH);
+            repaint();
         } else {
             highlightAttraction(id);
         }
@@ -230,8 +233,9 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
 
         g2.drawImage(controller.getMapImage(), worldToPixelX(-.5), worldToPixelY(-.5), (int)(MAP_WIDTH * scale), (int)(MAP_HEIGHT * scale), null);
 
-        drawNodes(g2);
         drawPath(g2);
+        drawNodes(g2);
+
 
         g2.setColor(Color.GRAY);
         g2.fillRect(0, 0, MAP_X, WINDOW_HEIGHT);
@@ -354,7 +358,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         attractionInfoPanel.setBackground(Color.WHITE);
         this.add(attractionInfoPanel);
 
-        JButton apiLinkButton = new JButton("Powered by QueueTimes");
+        JButton apiLinkButton = new JButton("Powered by Queue-Times.com");
         apiLinkButton.setContentAreaFilled(false);
         apiLinkButton.setBorderPainted(false);
         apiLinkButton.setFocusPainted(false);
@@ -364,13 +368,15 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         apiLinkButton.addActionListener(e -> {
             try {
                 Desktop.getDesktop().browse(new URI("https://queue-times.com/"));
+                apiLinkButton.setForeground(Color.MAGENTA);
             } catch(URISyntaxException | IOException ex) {
                 ex.printStackTrace();
+                apiLinkButton.setForeground(Color.MAGENTA);
             }
         });
         this.add(apiLinkButton);
 
-        JFrame frame = new JFrame("Le epic map");
+        JFrame frame = new JFrame("Disneyland Route Map App");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(WINDOW_WIDTH, WINDOW_HEIGHT);
         frame.setResizable(false);
@@ -378,6 +384,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         frame.add(this);
         frame.setVisible(true);
         frame.setResizable(false);
+        frame.setIconImage(controller.getMapImage());
 
         unhighlightAttraction();
     }
