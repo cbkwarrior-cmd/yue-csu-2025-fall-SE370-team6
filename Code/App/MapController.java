@@ -13,13 +13,16 @@ import java.util.function.BiConsumer;
 import javax.imageio.ImageIO;
 
 public class MapController {
+    private final double STEPS_PER_METER = 1.31;
+    private final double STEPS_PER_SECOND = 1.5;
+
     private Map map;
 
     // Key-value pairs of [attractionID : index into map's list of nodes]
     private HashMap<Integer, Integer> attractionsTable = new HashMap<>();
 
-    private int pathDistance;
-    private int pathETA;
+    private double pathDistance;
+    private double pathETA;
 
     public MapController() {
     }
@@ -47,6 +50,9 @@ public class MapController {
                 while(!(ln = nodesReader.readLine()).contains("|")) {
                     node.getDistances().add(Double.parseDouble(ln));
                 }
+                while(!(ln = nodesReader.readLine()).contains("|")) {
+                    node.getConnectionTypes().add(Integer.parseInt(ln));
+                }
 
                 nodes.add(node);
                 if(attractionID != -1) {
@@ -65,14 +71,14 @@ public class MapController {
     }
 
     public ArrayList<Point.Double> findPath(int startID, int endID) {
-        // Implementation of Dijkstra's algo sourced from: https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm
+        // Implementation of Dijkstra's algorithm sourced from: https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm
 
         int sourceIndex = attractionsTable.get(startID);
         int endIndex = attractionsTable.get(endID);
         ArrayList<Point.Double> path = new ArrayList<>();
 
         double[] dist = new double[map.getNodes().size()];
-        int[] eta = new int[map.getNodes().size()];
+        double[] eta = new double[map.getNodes().size()];
         int[] prev = new int[map.getNodes().size()];
         PriorityQueue<Integer> Q = new PriorityQueue<>((a, b) -> Double.compare(dist[a], dist[b]));
 
@@ -99,7 +105,7 @@ public class MapController {
                 double alt = dist[u] + d;
                 if (alt < dist[v]) {
                     dist[v] = alt;
-                    eta[v] = eta[u] + 1;
+                    eta[v] = eta[u] + (d * STEPS_PER_METER) / STEPS_PER_SECOND;
                     prev[v] = u;
                     Q.add(v);
                 }
@@ -111,7 +117,7 @@ public class MapController {
             path.add(new Point.Double(node.getX(), node.getY()));
         }
 
-        pathDistance = (int)(dist[endIndex] * 1000);
+        pathDistance = dist[endIndex];
         pathETA = eta[endIndex];
 
         Collections.reverse(path);
@@ -145,7 +151,7 @@ public class MapController {
         return pathDistance;
     }
 
-    public int getPathETA() {
+    public double getPathETA() {
         return pathETA;
     }
 }

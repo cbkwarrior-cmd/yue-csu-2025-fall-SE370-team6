@@ -7,6 +7,7 @@ public class MapNode {
     private String name;
     private ArrayList<Integer> connections;
     private ArrayList<Double> distances;
+    private ArrayList<Integer> connectionTypes;
 
     public MapNode(String name, int attractionID, int landID, double x, double y) {
         this.name = name;
@@ -16,6 +17,7 @@ public class MapNode {
         this.y = y;
         this.connections = new ArrayList<>();
         this.distances = new ArrayList<>();
+        this.connectionTypes = new ArrayList<>();
     }
 
     public String getName() {
@@ -44,5 +46,9 @@ public class MapNode {
 
     public ArrayList<Double> getDistances() {
         return distances;
+    }
+
+    public ArrayList<Integer> getConnectionTypes() {
+        return connectionTypes;
     }
 }
