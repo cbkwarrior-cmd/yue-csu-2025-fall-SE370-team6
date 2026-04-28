@@ -9,7 +9,6 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.Toolkit;
-import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
@@ -131,8 +130,8 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         }
 
         if(this.uiState == UIState.SHOW_PATH) {
-            this.routeEtaLabel.setText("10000");
-            this.routeDistLabel.setText("10000");
+            this.routeEtaLabel.setText("" + controller.getPathETA());
+            this.routeDistLabel.setText("" + controller.getPathDistance());
         }
         else {
             this.routeEtaLabel.setText("N/A");
@@ -280,6 +279,8 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
     }
 
     public void startView() {
+        System.setProperty("sun.java2d.uiScale.enabled", "true");
+
         this.setFocusable(true);
         this.addMouseListener(this);
         this.addMouseMotionListener(this);
