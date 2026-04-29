@@ -9,7 +9,6 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.Point;
 import java.awt.Toolkit;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
@@ -59,9 +58,9 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         routeButton.setText(text);
     }
 
-    public void updateRouteLabels(double eta, double distance) {
-        routeEtaLabel.setText(eta == -1 ? "N/A" : "" + eta);
-        routeDistLabel.setText(distance == -1 ? "N/A" : "" + distance);
+    public void updateRouteLabels(String eta, String numSteps) {
+        routeEtaLabel.setText(eta);
+        routeDistLabel.setText(numSteps);
     }
 
     public void mousePressed(MouseEvent e) {
@@ -84,7 +83,6 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
 
     public void mouseWheelMoved(MouseWheelEvent e) {
         controller.handleMouseWheelMove(e, this);
-        repaint();
     }
 
     public void mouseClicked(MouseEvent e) { }
@@ -96,7 +94,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D)g;
 
-        controller.drawMapImage(g2);
+        g2.drawImage(controller.getMapImage(), controller.worldToPixelX(-.5), controller.worldToPixelY(-.5), (int)(MAP_WIDTH * controller.getMapScale()), (int)(MAP_HEIGHT * controller.getMapScale()), null);
 
         g2.setColor(Color.BLUE);
         float width = 3f;
@@ -225,16 +223,15 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         controller.unhighlightAttraction(this);
     }
 
-    public JPanel getAttractionsPanel() {
-        return attractionsPanel;
+    public void updateAttractionButtons(boolean disabled) {
+        for(JButton button : attractionButtons) {
+            button.setBackground(disabled ? Color.LIGHT_GRAY : Color.BLUE);
+        }
     }
 
-    public ArrayList<JButton> getAttractionButtons() {
-        return attractionButtons;
-    }
-
-    public JTextArea getAttractionInfoLabel() {
-        return attractionInfoLabel;
+    public void setAttractionInfo(String text) {
+        attractionInfoLabel.setText(text);
+        attractionInfoLabel.setCaretPosition(0);
     }
 
     public int getAttractionRadius() {

@@ -1,6 +1,10 @@
 package org.DisneylandMap;
 
 public class MapAttraction extends MapNode {
+    public static final int CONNECTION_TYPE_WALKWAY = 0;
+    public static final int CONNECTION_TYPE_TRAIN = 1;
+    public static final int CONNECTION_TYPE_PARADE = 2;
+
     private String name;
     private int attractionID, landID;
 

@@ -1,35 +1,17 @@
 package org.DisneylandMap;
 
 import java.io.IOException;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.PriorityQueue;
-import java.awt.BasicStroke;
-import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Component;
-import java.awt.Desktop;
-import java.awt.Dimension;
-import java.awt.Font;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
 import java.awt.Point;
-import java.awt.Toolkit;
 import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.awt.event.MouseMotionListener;
 import java.awt.event.MouseWheelEvent;
-import java.awt.event.MouseWheelListener;
-import java.net.URI;
-import java.net.URISyntaxException;
-
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
+import java.awt.image.BufferedImage;
 import javax.swing.SwingUtilities;
 
 public class MapController {
@@ -39,11 +21,17 @@ public class MapController {
     private final double STEPS_PER_METER = 1.31;
     private final double STEPS_PER_SECOND = 1.5;
 
+    private final LocalTime PARADE_WEEKDAY_START = LocalTime.of(20, 30);
+    private final LocalTime PARADE_WEEKDAY_END = LocalTime.of(21, 10);
+
+    private final LocalTime PARADE_WEEKEND_START = LocalTime.of(22, 30);
+    private final LocalTime PARADE_WEEKEND_END = LocalTime.of(23, 10);
+
     private IQueueTime adaptor;
     private Map map;
 
-    private double routeETA;
-    private double routeDist;
+    private int routeETA;
+    private int routeDist;
 
     private double cameraX = 0, cameraY = 0;
     private double scale = 1.0;
@@ -69,11 +57,11 @@ public class MapController {
         unhighlightAttraction(view);
     }
 
-    private int worldToPixelX(double x) {
+    public int worldToPixelX(double x) {
         return MapView.MAP_X + (int)((x + .5 - cameraX) * MapView.MAP_WIDTH * scale);
     }
 
-    private int worldToPixelY(double y) {
+    public int worldToPixelY(double y) {
         return MapView.MAP_Y + (int)((y + .5 - cameraY) * MapView.MAP_HEIGHT * scale);
     }
 
@@ -88,14 +76,13 @@ public class MapController {
     private void highlightAttraction(int id, MapView view) {
         this.highlightedAttractionID = id;
         //TODO: Set text to highlighted attraction description:
-        view.getAttractionInfoLabel().setText(map.getAttractionFromID(highlightedAttractionID).getName() + ":");
-        view.getAttractionInfoLabel().setCaretPosition(0);
+        view.setAttractionInfo(map.getAttractionFromID(highlightedAttractionID).getName() + ":");
         setUiState(uiState, view);
     }
 
     public void unhighlightAttraction(MapView view) {
         this.highlightedAttractionID = -1;
-        view.getAttractionInfoLabel().setText("[No Attraction Highlighted]");
+        view.setAttractionInfo("[No Attraction Highlighted]");
         setUiState(uiState, view);
     }
 
@@ -136,15 +123,28 @@ public class MapController {
             } break;
         }
 
-        for(JButton button : view.getAttractionButtons()) {
-            button.setBackground(this.uiState == UIState.SELECT_POINT_B ? Color.LIGHT_GRAY : Color.BLUE);
-        }
+        view.updateAttractionButtons(this.uiState == UIState.SELECT_POINT_B);
 
         if(this.uiState == UIState.SHOW_PATH) {
-            view.updateRouteLabels(routeETA, routeDist);
+            int etaMinutes = routeETA / 60;
+
+            String etaText = "";
+            if(etaMinutes == 0) {
+                etaText = "" + routeETA + " sec" + (routeETA == 1 ? "" : "s");
+            }
+            else {
+                etaText = "" + etaMinutes + " min" + (etaMinutes == 1 ? "" : "s");
+
+                int etaHours = etaMinutes / 60;
+                if(etaHours != 0) {
+                    etaText = "" + etaHours + " hr" + (etaHours == 1 ? "" : "s") + " " + etaText;
+                }
+            }
+
+            view.updateRouteLabels(etaText, "" + routeDist + " steps");
         }
         else {
-            view.updateRouteLabels(-1, -1);
+            view.updateRouteLabels("N/A", "N/A");
         }
     }
 
@@ -248,22 +248,33 @@ public class MapController {
         int endIndex = map.getAttractionIndexFromID(endID);
 
         double[] dist = new double[map.getNodes().size()];
-        double[] eta = new double[map.getNodes().size()];
         int[] prev = new int[map.getNodes().size()];
-        PriorityQueue<Integer> Q = new PriorityQueue<>((a, b) -> Double.compare(dist[a], dist[b]));
+
+        class NodeDist {
+            int nodeIndex;
+            double dist;
+
+            NodeDist(int nodeIndex, double dist) {
+                this.nodeIndex = nodeIndex;
+                this.dist = dist;
+            }
+        }
+
+        PriorityQueue<NodeDist> Q = new PriorityQueue<>((a, b) -> Double.compare(a.dist, b.dist));
 
         for(int i = 0; i < map.getNodes().size(); i++) {
             dist[i] = Double.MAX_VALUE;
-            eta[i] = 0;
             prev[i] = -1;
         }
         dist[sourceIndex] = 0;
         // I believe I can get away with this?
-        Q.add(sourceIndex);
+        Q.add(new NodeDist(sourceIndex, dist[sourceIndex]));
 
         while (!Q.isEmpty()) {
-            int u = Q.poll();
-            if (dist[u] == Double.MAX_VALUE) { continue; }
+            NodeDist curr = Q.poll();
+            int u = curr.nodeIndex;
+
+            if (curr.dist > dist[u]) { continue; }
             if (u == endIndex) { break; }
 
             MapNode node = map.getNodes().get(u);
@@ -271,15 +282,36 @@ public class MapController {
             for (int i = 0; i < node.getConnections().size(); i++) {
                 int v = node.getConnections().get(i);
 
-                double d = node.getDistances().get(i);
+                int type = node.getConnectionTypes().get(i);
+                double d = 0;
+
+                if(type == MapAttraction.CONNECTION_TYPE_WALKWAY) {
+                    d = node.getDistances().get(i);
+                }
+                else if(type == MapAttraction.CONNECTION_TYPE_PARADE) {
+                    LocalDate currentDate = LocalDate.now();
+                    boolean isWeekend = currentDate.getDayOfWeek().getValue() >= DayOfWeek.FRIDAY.getValue();
+
+                    LocalTime startTime = isWeekend ? PARADE_WEEKEND_START : PARADE_WEEKDAY_START;
+                    LocalTime endTime = isWeekend ? PARADE_WEEKEND_END : PARADE_WEEKDAY_END;
+                    LocalTime currentTime = LocalTime.now();
+
+                    if(currentTime.isAfter(startTime) && currentTime.isBefore(endTime)) {
+                        continue;
+                    }
+                }
+
                 double alt = dist[u] + d;
                 if (alt < dist[v]) {
                     dist[v] = alt;
-                    eta[v] = eta[u] + (d * STEPS_PER_METER) / STEPS_PER_SECOND;
                     prev[v] = u;
-                    Q.add(v);
+                    Q.add(new NodeDist(v, alt));
                 }
             }
+        }
+
+        if(dist[endIndex] == Double.MAX_VALUE) {
+            path.clear();
         }
 
         for (int i = endIndex; i != -1; i = prev[i]) {
@@ -287,10 +319,10 @@ public class MapController {
             path.add(new Point.Double(node.getX(), node.getY()));
         }
 
-        routeDist = dist[endIndex];
-        routeETA = eta[endIndex];
-
         Collections.reverse(path);
+
+        routeDist = (int)(dist[endIndex] * STEPS_PER_METER);
+        routeETA = (int)(routeDist / STEPS_PER_SECOND);
     }
 
     public interface PathEvent {
@@ -309,12 +341,13 @@ public class MapController {
         }
     }
 
-    public void drawMapImage(Graphics2D g) {
-        g.drawImage(map.getMapImage(), worldToPixelX(-.5), worldToPixelY(-.5), (int)(MapView.MAP_WIDTH * scale), (int)(MapView.MAP_HEIGHT * scale), null);
-    }
-
+    //TODO: Potentially remove this after displaying wait times is implemented
     public int getAttractionWaitTime(MapAttraction attraction) throws IOException, InterruptedException {
         return adaptor.getWaitTime(attraction.getLandID(), attraction.getAttractionID());
+    }
+
+    public BufferedImage getMapImage() {
+        return map.getMapImage();
     }
 
     public double getMapScale() {
