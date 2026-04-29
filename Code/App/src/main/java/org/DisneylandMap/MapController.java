@@ -1,91 +1,251 @@
 package org.DisneylandMap;
 
-import java.awt.Point;
-import java.awt.image.BufferedImage;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.PriorityQueue;
-import java.util.function.BiConsumer;
+import java.awt.BasicStroke;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Desktop;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Point;
+import java.awt.Toolkit;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+import java.awt.event.MouseMotionListener;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
+import java.net.URI;
+import java.net.URISyntaxException;
 
-import javax.imageio.ImageIO;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.SwingUtilities;
 
 public class MapController {
+    private final String MAP_IMAGE_PATH = "map.jpeg";
+    private final String MAP_NODES_PATH = "nodes.txt";
+
     private final double STEPS_PER_METER = 1.31;
     private final double STEPS_PER_SECOND = 1.5;
 
+    private IQueueTime adaptor;
     private Map map;
 
-    // Key-value pairs of [attractionID : index into map's list of nodes]
-    private HashMap<Integer, Integer> attractionsTable = new HashMap<>();
+    private double routeETA;
+    private double routeDist;
 
-    private double pathDistance;
-    private double pathETA;
+    private double cameraX = 0, cameraY = 0;
+    private double scale = 1.0;
 
-    //initializes the adaptor of the Queue-Times API
-    public IQueueTime adaptor = new QueueTimesAdaptor();
+    private double dragXStart, dragYStart;
+    private boolean dragging = false;
 
-    public MapController() {
+    private int mouseX, mouseY;
+
+    private int highlightedAttractionID;
+    private ArrayList<Point.Double> path = new ArrayList<>();
+
+    private enum UIState {
+        NAVIGATE,
+        SELECT_POINT_B,
+        SHOW_PATH,
+    };
+    private UIState uiState = UIState.NAVIGATE;
+
+    public MapController(MapView view) {
+        this.adaptor = new QueueTimesAdaptor();
+        this.map = new Map(MAP_IMAGE_PATH, MAP_NODES_PATH);
+        unhighlightAttraction(view);
     }
 
-    public void loadMapFromFiles(String mapImagePath, String mapNodesPath) {
-        try {
-            BufferedImage mapImage = ImageIO.read(new File(mapImagePath));
+    private int worldToPixelX(double x) {
+        return MapView.MAP_X + (int)((x + .5 - cameraX) * MapView.MAP_WIDTH * scale);
+    }
 
-            ArrayList<MapNode> nodes = new ArrayList<>();
-            BufferedReader nodesReader = new BufferedReader(new FileReader(mapNodesPath));
+    private int worldToPixelY(double y) {
+        return MapView.MAP_Y + (int)((y + .5 - cameraY) * MapView.MAP_HEIGHT * scale);
+    }
 
-            String ln;
-            while((ln = nodesReader.readLine()) != null) {
-                String name = nodesReader.readLine();
-                int attractionID = Integer.parseInt(nodesReader.readLine());
-                int landID = Integer.parseInt(nodesReader.readLine());
-                double x = Double.parseDouble(nodesReader.readLine());
-                double y = Double.parseDouble(nodesReader.readLine());
+    private double pixelToWorldX(int x) {
+        return cameraX + ((double)(x - MapView.MAP_X) / MapView.MAP_WIDTH - .5) / scale;
+    }
 
-                MapNode node;
+    private double pixelToWorldY(int y) {
+        return cameraY + ((double)(y - MapView.MAP_Y) / MapView.MAP_HEIGHT - .5) / scale;
+    }
 
-                if(attractionID == -1) {
-                    node = new MapNode(x, y);
-                }
-                else {
-                    node = new MapAttraction(name, attractionID, landID, x, y);
-                    attractionsTable.put(attractionID, nodes.size());
-                    System.out.println("" + attractionID + " " + (nodes.size()));
-                }
+    private void highlightAttraction(int id, MapView view) {
+        this.highlightedAttractionID = id;
+        //TODO: Set text to highlighted attraction description:
+        view.getAttractionInfoLabel().setText(map.getAttractionFromID(highlightedAttractionID).getName() + ":");
+        view.getAttractionInfoLabel().setCaretPosition(0);
+        setUiState(uiState, view);
+    }
 
-                while(!(ln = nodesReader.readLine()).contains("|")) {
-                    node.getConnections().add(Integer.parseInt(ln));
-                }
-                while(!(ln = nodesReader.readLine()).contains("|")) {
-                    node.getDistances().add(Double.parseDouble(ln));
-                }
-                while(!(ln = nodesReader.readLine()).contains("|")) {
-                    node.getConnectionTypes().add(Integer.parseInt(ln));
-                }
+    public void unhighlightAttraction(MapView view) {
+        this.highlightedAttractionID = -1;
+        view.getAttractionInfoLabel().setText("[No Attraction Highlighted]");
+        setUiState(uiState, view);
+    }
 
-                nodes.add(node);
+    public interface AttractionEvent {
+        void execute(int pixelX, int pixelY, int id, String name, boolean highlighted);
+    }
+
+    public void forEachAttraction(MapView view, AttractionEvent e) {
+        map.forEachAttraction((id, attraction) -> {
+            int x = worldToPixelX(attraction.getX());
+            int y = worldToPixelY(attraction.getY());
+
+            if(x < MapView.MAP_X - MapView.ATTRACTION_DIAMETER || x >= MapView.MAP_X + MapView.MAP_WIDTH + MapView.ATTRACTION_DIAMETER || y < MapView.MAP_Y - MapView.ATTRACTION_DIAMETER || y >= MapView.MAP_Y + MapView.MAP_HEIGHT + MapView.ATTRACTION_DIAMETER) {
+                return;
             }
 
-            nodesReader.close();
+            e.execute(x, y, id, attraction.getName(), id == highlightedAttractionID);
+        });
+    }
 
-            map = new Map(nodes, mapImage);
-            System.out.println(map.getNodes().size());
-        } catch(IOException e) {
-            e.printStackTrace();
+    private void setUiState(UIState newState, MapView view) {
+        this.uiState = newState;
+
+        switch(uiState) {
+            case NAVIGATE: {
+                if(highlightedAttractionID == -1) {
+                    view.updateRouteButton(new Color(178, 178, 178), "Requires Start Point to Route");
+                }
+                else {
+                    view.updateRouteButton(Color.GREEN, "Begin Routing");
+                }
+            } break;
+            case SELECT_POINT_B: {
+                view.updateRouteButton(new Color(183, 51, 75), "Cancel");
+            } break;
+            case SHOW_PATH: {
+                view.updateRouteButton(new Color(51, 154, 183), "Clear Path");
+            } break;
+        }
+
+        for(JButton button : view.getAttractionButtons()) {
+            button.setBackground(this.uiState == UIState.SELECT_POINT_B ? Color.LIGHT_GRAY : Color.BLUE);
+        }
+
+        if(this.uiState == UIState.SHOW_PATH) {
+            view.updateRouteLabels(routeETA, routeDist);
+        }
+        else {
+            view.updateRouteLabels(-1, -1);
         }
     }
 
-    public ArrayList<Point.Double> findPath(int startID, int endID) {
-        // Implementation of Dijkstra's algorithm sourced from: https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm
+    public void handleRouteButton(MapView view) {
+        switch (uiState) {
+            case NAVIGATE: {
+                if (highlightedAttractionID == -1) { break; }
+                setUiState(UIState.SELECT_POINT_B, view);
+            } break;
+            case SELECT_POINT_B: {
+                setUiState(UIState.NAVIGATE, view);
+            } break;
+            case SHOW_PATH: {
+                setUiState(UIState.NAVIGATE, view);
+                view.repaint();
+            } break;
+        }
+    }
 
-        int sourceIndex = attractionsTable.get(startID);
-        int endIndex = attractionsTable.get(endID);
-        ArrayList<Point.Double> path = new ArrayList<>();
+    public void handleAttractionButton(int id, MapView view) {
+        if(uiState != UIState.SELECT_POINT_B) {
+            highlightAttraction(id, view);
+        }
+    }
+
+    private void handleAttractionClick(MapView view, int id) {
+        if (uiState == UIState.SELECT_POINT_B && highlightedAttractionID != id) {
+            findPath(highlightedAttractionID, id);
+            setUiState(UIState.SHOW_PATH, view);
+            view.repaint();
+        } else {
+            highlightAttraction(id, view);
+        }
+    }
+
+    public void handleMousePress(MouseEvent e, MapView view) {
+        if(SwingUtilities.isRightMouseButton(e) && e.getX() >= MapView.MAP_X && e.getY() < MapView.MAP_HEIGHT) {
+            dragXStart = pixelToWorldX(e.getX());
+            dragYStart = pixelToWorldY(e.getY());
+            dragging = true;
+        }
+        else if(SwingUtilities.isLeftMouseButton(e)) {
+            if(uiState != UIState.SELECT_POINT_B) {
+                unhighlightAttraction(view);
+            }
+
+            forEachAttraction(view, (x, y, id, name, highlighted) -> {
+                double dx = mouseX - x, dy = mouseY - y;
+
+                if(dx * dx + dy * dy < view.getAttractionRadius() * view.getAttractionRadius() * scale) {
+                    handleAttractionClick(view, id);
+                }
+            });
+        }
+        view.repaint();
+    }
+
+    public void handleMouseRelease() {
+        dragging = false;
+    }
+
+    public void handleMouseDrag(MapView view) {
+        if(dragging) {
+            double bounds = -1.0 / (scale * 2.0);
+            cameraX = Math.clamp(dragXStart + cameraX - pixelToWorldX(mouseX), bounds, (1.0 + bounds));
+            cameraY = Math.clamp(dragYStart + cameraY - pixelToWorldY(mouseY), bounds, (1.0 + bounds));
+        }
+        view.repaint();
+    }
+
+    public void handleMouseMove(MouseEvent e) {
+        mouseX = e.getX();
+        mouseY = e.getY();
+    }
+
+    public void handleMouseWheelMove(MouseWheelEvent e, MapView view) {
+        if(e.getWheelRotation() > 0) {
+            if(scale >= 2) {
+                cameraX -= .5 / scale;
+                cameraY -= .5 / scale;
+                scale *= .5;
+            }
+        }
+        else if(scale <= 4) {
+            scale *= 2;
+            cameraX += .5 / scale;
+            cameraY += .5 / scale;
+        }
+
+        double bounds = -1.0 / (scale * 2.0);
+        this.cameraX = Math.clamp(cameraX, bounds, (1.0 + bounds));
+        this.cameraY = Math.clamp(cameraY, bounds, (1.0 + bounds));
+        view.repaint();
+    }
+
+    // Implementation of Dijkstra's algorithm sourced from: https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm
+    public void findPath(int startID, int endID) {
+        path.clear();
+
+        int sourceIndex = map.getAttractionIndexFromID(startID);
+        int endIndex = map.getAttractionIndexFromID(endID);
 
         double[] dist = new double[map.getNodes().size()];
         double[] eta = new double[map.getNodes().size()];
@@ -127,40 +287,37 @@ public class MapController {
             path.add(new Point.Double(node.getX(), node.getY()));
         }
 
-        pathDistance = dist[endIndex];
-        pathETA = eta[endIndex];
+        routeDist = dist[endIndex];
+        routeETA = eta[endIndex];
 
         Collections.reverse(path);
-        return path;
     }
 
-    public void forEachAttraction(BiConsumer<Integer, MapAttraction> action) {
-        for(java.util.Map.Entry<Integer, Integer> e : attractionsTable.entrySet()) {
-            action.accept(e.getKey(), (MapAttraction)map.getNodes().get(e.getValue()));
+    public interface PathEvent {
+        public void execute(int x0, int y0, int x1, int y1);
+    }
+
+    public void forEachPathPoint(PathEvent e) {
+        if(uiState == UIState.SHOW_PATH) {
+            for(int i = 0; i < path.size() - 1; i++) {
+                int x0 = worldToPixelX(path.get(i).x);
+                int y0 = worldToPixelY(path.get(i).y);
+                int x1 = worldToPixelX(path.get(i + 1).x);
+                int y1 = worldToPixelY(path.get(i + 1).y);
+                e.execute(x0, y0, x1, y1);
+            }
         }
     }
 
-    public MapAttraction getAttractionFromID(int id) {
-        return (MapAttraction)map.getNodes().get(attractionsTable.get(id));
+    public void drawMapImage(Graphics2D g) {
+        g.drawImage(map.getMapImage(), worldToPixelX(-.5), worldToPixelY(-.5), (int)(MapView.MAP_WIDTH * scale), (int)(MapView.MAP_HEIGHT * scale), null);
     }
 
-    // Note for Morgan: Here are the methods to put your code into.
-    // If this isn't structured how you'd want it to be, change it.
     public int getAttractionWaitTime(MapAttraction attraction) throws IOException, InterruptedException {
-
         return adaptor.getWaitTime(attraction.getLandID(), attraction.getAttractionID());
     }
 
-
-    public BufferedImage getMapImage() {
-        return map.getMapImage();
-    }
-
-    public double getPathDistance() {
-        return pathDistance;
-    }
-
-    public double getPathETA() {
-        return pathETA;
+    public double getMapScale() {
+        return scale;
     }
 }
