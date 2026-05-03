@@ -401,8 +401,8 @@ Chip 'n' Dale's GADGETcoaster
 |
 n:
 Donald's Duck Pond
-114
 13814
+114
 0.07246662621359246
 -0.3684769417475724
 202
