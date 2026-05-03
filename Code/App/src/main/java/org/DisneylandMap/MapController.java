@@ -187,11 +187,7 @@ public class MapController {
         view.repaint();
     }
 
-    public void handleAttractionButton(int id, MapView view) {
-        handleAttractionClick(view, id);
-    }
-
-    private void handleAttractionClick(MapView view, int id) {
+    public void handleAttractionClick(MapView view, int id) {
         if (uiState == UIState.SELECT_POINT_B && highlightedAttractionID != id) {
             findPath(highlightedAttractionID, id);
             setUiState(UIState.SHOW_PATH, view);

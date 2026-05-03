@@ -39,7 +39,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
     public static final int MAP_X = WINDOW_HEIGHT - MAP_HEIGHT;
     public static final int MAP_Y = 0;
 
-    public static final int ATTRACTION_DIAMETER =  20, ATTRACTION_RADIUS = ATTRACTION_DIAMETER / 2;
+    public static final int ATTRACTION_DIAMETER = 20, ATTRACTION_RADIUS = ATTRACTION_DIAMETER / 2;
 
     private MapController controller;
 
@@ -152,7 +152,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
             button.setBackground(Color.BLUE);
 
             button.addActionListener(e -> {
-                controller.handleAttractionButton(id, this);
+                controller.handleAttractionClick(this, id);
                 repaint();
             });
 
