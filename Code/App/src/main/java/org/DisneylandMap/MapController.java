@@ -218,8 +218,9 @@ public class MapController {
 
             forEachAttraction(view, (x, y, id, name, highlighted) -> {
                 double dx = mouseX - x, dy = mouseY - y;
+                double r = view.getAttractionRadius() * scale;
 
-                if(dx * dx + dy * dy < view.getAttractionRadius() * view.getAttractionRadius() * scale) {
+                if(dx * dx + dy * dy < r * r) {
                     handleAttractionClick(view, id);
                 }
             });

@@ -29,9 +29,10 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 
 public class MapView extends JPanel implements MouseListener, MouseMotionListener, MouseWheelListener {
+    private static final int WINDOW_BOUNDS_INCREASE = 30;
     public static final Dimension DISPLAY_DIMENSIONS = Toolkit.getDefaultToolkit().getScreenSize();
-    public static final int WINDOW_HEIGHT = (int)DISPLAY_DIMENSIONS.getHeight() - 50;
-    public static final int WINDOW_WIDTH = WINDOW_HEIGHT - 50;
+    public static final int WINDOW_HEIGHT = (int)DISPLAY_DIMENSIONS.getHeight() - WINDOW_BOUNDS_INCREASE - 50;
+    public static final int WINDOW_WIDTH = WINDOW_HEIGHT - WINDOW_BOUNDS_INCREASE;
 
     public static final int MAP_WIDTH = (int)(WINDOW_WIDTH / 1.5);
     public static final int MAP_HEIGHT = (int)(WINDOW_HEIGHT / 1.5);
@@ -126,7 +127,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         this.addMouseMotionListener(this);
         this.addMouseWheelListener(this);
 
-        this.setBackground(Color.BLACK);
+        this.setBackground(Color.GRAY);
         this.setLayout(null);
 
         final int ENTRIES_PANEL_MARGIN = 15;
@@ -210,9 +211,10 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         });
         this.add(apiLinkButton);
 
+        int heightIncrease = System.getProperty("os.name").startsWith("Windows") ? WINDOW_BOUNDS_INCREASE : 0;
         JFrame frame = new JFrame("Disneyland Route Map App");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(WINDOW_WIDTH, WINDOW_HEIGHT);
+        frame.setSize(WINDOW_WIDTH + heightIncrease, WINDOW_HEIGHT + heightIncrease);
         frame.setResizable(false);
         frame.setLocationRelativeTo(null);
         frame.add(this);
