@@ -150,6 +150,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
             button.setPreferredSize(new Dimension(200, 60));
             button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 60));
             button.setBackground(Color.BLUE);
+            button.setForeground(Color.WHITE);
 
             button.addActionListener(e -> {
                 controller.handleAttractionClick(this, id);
