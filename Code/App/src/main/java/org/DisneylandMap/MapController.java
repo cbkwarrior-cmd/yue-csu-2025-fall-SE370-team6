@@ -268,81 +268,89 @@ public class MapController {
     // Implementation of Dijkstra's algorithm sourced from: https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm
     public void findPath(int startID, int endID) {
         path.clear();
-        routeETA = 0;
-        routeDist = 0;
+
+        LocalDate currentDate = LocalDate.now();
+        boolean isWeekend = currentDate.getDayOfWeek().getValue() >= DayOfWeek.FRIDAY.getValue();
+
+        LocalTime startTime = isWeekend ? PARADE_WEEKEND_START : PARADE_WEEKDAY_START;
+        LocalTime endTime = isWeekend ? PARADE_WEEKEND_END : PARADE_WEEKDAY_END;
+        LocalTime currentTime = LocalTime.now();
+
+        int trainWaitTime = 0;
+        try {
+            trainWaitTime = getTrainWaitTime() * 60;
+        } catch(IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
 
         int sourceIndex = map.getAttractionIndexFromID(startID);
         int endIndex = map.getAttractionIndexFromID(endID);
 
-        double[] weight = new double[map.getNodes().size()];
+        double[] eta = new double[map.getNodes().size()];
         double[] dist = new double[map.getNodes().size()];
         int[] prev = new int[map.getNodes().size()];
 
-        class NodeWeight {
+        class NodeETA {
             int nodeIndex;
-            double weight;
+            double eta;
 
-            NodeWeight(int nodeIndex, double weight) {
+            NodeETA(int nodeIndex, double eta) {
                 this.nodeIndex = nodeIndex;
-                this.weight = weight;
+                this.eta = eta;
             }
         }
 
-        PriorityQueue<NodeWeight> Q = new PriorityQueue<>((a, b) -> Double.compare(a.weight, b.weight));
+        PriorityQueue<NodeETA> Q = new PriorityQueue<>((a, b) -> Double.compare(a.eta, b.eta));
 
         for(int i = 0; i < map.getNodes().size(); i++) {
-            weight[i] = Double.MAX_VALUE;
+            eta[i] = Double.MAX_VALUE;
             dist[i] = 0;
             prev[i] = -1;
         }
-        weight[sourceIndex] = 0;
+        eta[sourceIndex] = 0;
         // I believe I can get away with this?
-        Q.add(new NodeWeight(sourceIndex, weight[sourceIndex]));
+        Q.add(new NodeETA(sourceIndex, eta[sourceIndex]));
 
         while (!Q.isEmpty()) {
-            NodeWeight curr = Q.poll();
+            NodeETA curr = Q.poll();
             int u = curr.nodeIndex;
 
-            if (curr.weight > weight[u]) { continue; }
+            if (curr.eta > eta[u]) { continue; }
             if (u == endIndex) { break; }
 
             MapNode node = map.getNodes().get(u);
 
             for (int i = 0; i < node.getConnections().size(); i++) {
                 int v = node.getConnections().get(i);
-
-                int type = node.getConnectionTypes().get(i);
                 double w = node.getDistances().get(i);
-                double d = w;
+                int type = node.getConnectionTypes().get(i);
 
-                if(type == MapAttraction.CONNECTION_TYPE_TRAIN) {
-                    w /= 3;
+                double d = w * STEPS_PER_METER;
+                double t;
+
+                if (type == MapAttraction.CONNECTION_TYPE_TRAIN) {
+                    t = trainWaitTime + (w / 3) * STEPS_PER_METER / STEPS_PER_SECOND;
                     d = 0;
                 }
-                else if(type == MapAttraction.CONNECTION_TYPE_PARADE) {
-                    LocalDate currentDate = LocalDate.now();
-                    boolean isWeekend = currentDate.getDayOfWeek().getValue() >= DayOfWeek.FRIDAY.getValue();
-
-                    LocalTime startTime = isWeekend ? PARADE_WEEKEND_START : PARADE_WEEKDAY_START;
-                    LocalTime endTime = isWeekend ? PARADE_WEEKEND_END : PARADE_WEEKDAY_END;
-                    LocalTime currentTime = LocalTime.now();
-
-                    if(currentTime.isAfter(startTime) && currentTime.isBefore(endTime)) {
-                        continue;
-                    }
+                else if (type == MapAttraction.CONNECTION_TYPE_PARADE
+                        && currentTime.isAfter(startTime) && currentTime.isBefore(endTime)) {
+                    continue;
+                }
+                else {
+                    t = w * STEPS_PER_METER / STEPS_PER_SECOND;
                 }
 
-                double alt = weight[u] + w;
-                if (alt < weight[v]) {
-                    weight[v] = alt;
+                double alt = eta[u] + t;
+                if (alt < eta[v]) {
+                    eta[v] = alt;
                     dist[v] = dist[u] + d;
                     prev[v] = u;
-                    Q.add(new NodeWeight(v, alt));
+                    Q.add(new NodeETA(v, alt));
                 }
             }
         }
 
-        if(weight[endIndex] == Double.MAX_VALUE) {
+        if(eta[endIndex] == Double.MAX_VALUE) {
             path.clear();
         }
 
@@ -353,8 +361,8 @@ public class MapController {
 
         Collections.reverse(path);
 
-        routeDist += (int)(dist[endIndex] * STEPS_PER_METER);
-        routeETA += (int)(routeDist / STEPS_PER_SECOND);
+        routeDist = (int)(dist[endIndex]);
+        routeETA = (int)(eta[endIndex]);
     }
 
     public interface PathEvent {
@@ -375,9 +383,12 @@ public class MapController {
 
     public int getAttractionWaitTime(MapAttraction attraction) throws IOException, InterruptedException {
         boolean isTrainStation = attraction.getAttractionID() < -1 && attraction.getAttractionID() >= -1 - NUM_TRAIN_STATIONS;
-        int landID = isTrainStation ? TRAIN_STATION_LAND_ID : attraction.getLandID();
-        int attractionID = isTrainStation ? TRAIN_STATION_ATTRACTION_ID : attraction.getAttractionID();
-        return adaptor.getWaitTime(landID, attractionID);
+
+        return isTrainStation ? getTrainWaitTime() : adaptor.getWaitTime(attraction.getLandID(), attraction.getAttractionID());
+    }
+
+    public int getTrainWaitTime() throws IOException, InterruptedException {
+        return adaptor.getWaitTime(TRAIN_STATION_LAND_ID, TRAIN_STATION_ATTRACTION_ID);
     }
 
     public BufferedImage getMapImage() {
