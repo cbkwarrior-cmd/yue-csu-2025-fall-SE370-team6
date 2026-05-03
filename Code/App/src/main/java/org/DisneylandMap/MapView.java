@@ -149,6 +149,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
             button.setAlignmentX(Component.LEFT_ALIGNMENT);
             button.setPreferredSize(new Dimension(200, 60));
             button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 60));
+            button.setBackground(Color.BLUE);
 
             button.addActionListener(e -> {
                 controller.handleAttractionButton(id, this);
@@ -222,12 +223,6 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         frame.setResizable(false);
 
         controller.unhighlightAttraction(this);
-    }
-
-    public void updateAttractionButtons(boolean disabled) {
-        for(JButton button : attractionButtons) {
-            button.setBackground(disabled ? Color.LIGHT_GRAY : Color.BLUE);
-        }
     }
 
     public void setAttractionInfo(String text) {

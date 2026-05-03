@@ -142,8 +142,6 @@ public class MapController {
             } break;
         }
 
-        view.updateAttractionButtons(this.uiState == UIState.SELECT_POINT_B);
-
         if(this.uiState == UIState.SHOW_PATH) {
             String etaText = "Impossible route";
             String distanceText = "Impossible route";
@@ -190,9 +188,7 @@ public class MapController {
     }
 
     public void handleAttractionButton(int id, MapView view) {
-        if(uiState != UIState.SELECT_POINT_B) {
-            highlightAttraction(id, view);
-        }
+        handleAttractionClick(view, id);
     }
 
     private void handleAttractionClick(MapView view, int id) {
