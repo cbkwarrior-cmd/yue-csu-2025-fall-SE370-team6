@@ -38,7 +38,6 @@ public class Map {
                 else {
                     node = new MapAttraction(name, attractionID, landID, x, y);
                     attractionsTable.put(attractionID, nodes.size());
-                    System.out.println("" + attractionID + " " + (nodes.size()));
                 }
 
                 while(!(ln = nodesReader.readLine()).contains("|")) {

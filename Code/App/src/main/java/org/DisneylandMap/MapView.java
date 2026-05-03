@@ -31,7 +31,7 @@ import javax.swing.JTextArea;
 public class MapView extends JPanel implements MouseListener, MouseMotionListener, MouseWheelListener {
     public static final Dimension DISPLAY_DIMENSIONS = Toolkit.getDefaultToolkit().getScreenSize();
     public static final int WINDOW_HEIGHT = (int)DISPLAY_DIMENSIONS.getHeight() - 50;
-    public static final int WINDOW_WIDTH = WINDOW_HEIGHT;
+    public static final int WINDOW_WIDTH = WINDOW_HEIGHT - 50;
 
     public static final int MAP_WIDTH = (int)(WINDOW_WIDTH / 1.5);
     public static final int MAP_HEIGHT = (int)(WINDOW_HEIGHT / 1.5);
@@ -65,7 +65,6 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
 
     public void mousePressed(MouseEvent e) {
         controller.handleMousePress(e, this);
-        repaint();
     }
 
     public void mouseReleased(MouseEvent e) {
@@ -177,7 +176,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         routeInfoPanel.add(routeDistTitle);
         routeInfoPanel.add(routeDistLabel);
 
-        Font infoPanelFont = new Font("Arial", Font.PLAIN, routeInfoPanel.getHeight() / 6);
+        Font infoPanelFont = new Font("Arial", Font.PLAIN, routeInfoPanel.getHeight() / 8);
         routeEtaTitle.setFont(infoPanelFont);
         routeEtaLabel.setFont(infoPanelFont);
         routeDistTitle.setFont(infoPanelFont);

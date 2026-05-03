@@ -27,6 +27,10 @@ public class MapController {
     private final LocalTime PARADE_WEEKEND_START = LocalTime.of(22, 30);
     private final LocalTime PARADE_WEEKEND_END = LocalTime.of(23, 10);
 
+    private final int NUM_TRAIN_STATIONS = 4;
+    private final int TRAIN_STATION_LAND_ID = 113;
+    private final int TRAIN_STATION_ATTRACTION_ID = 674;
+
     private IQueueTime adaptor;
     private Map map;
 
@@ -75,14 +79,29 @@ public class MapController {
 
     private void highlightAttraction(int id, MapView view) {
         this.highlightedAttractionID = id;
-        //TODO: Set text to highlighted attraction description:
-        view.setAttractionInfo(map.getAttractionFromID(highlightedAttractionID).getName() + ":");
+        try {
+            MapAttraction attraction = map.getAttractionFromID(highlightedAttractionID);
+            String info = "" + attraction.getName() + ":\n";
+            int waitTimeMinutes = getAttractionWaitTime(attraction);
+            if(waitTimeMinutes == -2) {
+                info += "Error: Failed to get wait time\n";
+            }
+            else if(waitTimeMinutes == -1) {
+                info += "This attraction is closed.";
+            }
+            else {
+                info += "Wait Time: " + waitTimeMinutes + " Minutes\n";
+            }
+            view.setAttractionInfo(info);
+        } catch(IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
         setUiState(uiState, view);
     }
 
     public void unhighlightAttraction(MapView view) {
         this.highlightedAttractionID = -1;
-        view.setAttractionInfo("[No Attraction Highlighted]");
+        view.setAttractionInfo("Press Node to View Attraction Info");
         setUiState(uiState, view);
     }
 
@@ -126,22 +145,28 @@ public class MapController {
         view.updateAttractionButtons(this.uiState == UIState.SELECT_POINT_B);
 
         if(this.uiState == UIState.SHOW_PATH) {
-            int etaMinutes = routeETA / 60;
+            String etaText = "Impossible route";
+            String distanceText = "Impossible route";
 
-            String etaText = "";
-            if(etaMinutes == 0) {
-                etaText = "" + routeETA + " sec" + (routeETA == 1 ? "" : "s");
-            }
-            else {
-                etaText = "" + etaMinutes + " min" + (etaMinutes == 1 ? "" : "s");
+            if(!path.isEmpty()) {
+                int etaMinutes = routeETA / 60;
 
-                int etaHours = etaMinutes / 60;
-                if(etaHours != 0) {
-                    etaText = "" + etaHours + " hr" + (etaHours == 1 ? "" : "s") + " " + etaText;
+                if(etaMinutes == 0) {
+                    etaText = "" + routeETA + " sec" + (routeETA == 1 ? "" : "s");
                 }
+                else {
+                    etaText = "" + etaMinutes + " min" + (etaMinutes == 1 ? "" : "s");
+
+                    int etaHours = etaMinutes / 60;
+                    if(etaHours != 0) {
+                        etaText = "" + etaHours + " hr" + (etaHours == 1 ? "" : "s") + " " + etaText;
+                    }
+                }
+
+                distanceText = "" + routeDist + " steps";
             }
 
-            view.updateRouteLabels(etaText, "" + routeDist + " steps");
+            view.updateRouteLabels(etaText, distanceText);
         }
         else {
             view.updateRouteLabels("N/A", "N/A");
@@ -159,9 +184,9 @@ public class MapController {
             } break;
             case SHOW_PATH: {
                 setUiState(UIState.NAVIGATE, view);
-                view.repaint();
             } break;
         }
+        view.repaint();
     }
 
     public void handleAttractionButton(int id, MapView view) {
@@ -174,10 +199,10 @@ public class MapController {
         if (uiState == UIState.SELECT_POINT_B && highlightedAttractionID != id) {
             findPath(highlightedAttractionID, id);
             setUiState(UIState.SHOW_PATH, view);
-            view.repaint();
         } else {
             highlightAttraction(id, view);
         }
+        view.repaint();
     }
 
     public void handleMousePress(MouseEvent e, MapView view) {
@@ -243,38 +268,42 @@ public class MapController {
     // Implementation of Dijkstra's algorithm sourced from: https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm
     public void findPath(int startID, int endID) {
         path.clear();
+        routeETA = 0;
+        routeDist = 0;
 
         int sourceIndex = map.getAttractionIndexFromID(startID);
         int endIndex = map.getAttractionIndexFromID(endID);
 
+        double[] weight = new double[map.getNodes().size()];
         double[] dist = new double[map.getNodes().size()];
         int[] prev = new int[map.getNodes().size()];
 
-        class NodeDist {
+        class NodeWeight {
             int nodeIndex;
-            double dist;
+            double weight;
 
-            NodeDist(int nodeIndex, double dist) {
+            NodeWeight(int nodeIndex, double weight) {
                 this.nodeIndex = nodeIndex;
-                this.dist = dist;
+                this.weight = weight;
             }
         }
 
-        PriorityQueue<NodeDist> Q = new PriorityQueue<>((a, b) -> Double.compare(a.dist, b.dist));
+        PriorityQueue<NodeWeight> Q = new PriorityQueue<>((a, b) -> Double.compare(a.weight, b.weight));
 
         for(int i = 0; i < map.getNodes().size(); i++) {
-            dist[i] = Double.MAX_VALUE;
+            weight[i] = Double.MAX_VALUE;
+            dist[i] = 0;
             prev[i] = -1;
         }
-        dist[sourceIndex] = 0;
+        weight[sourceIndex] = 0;
         // I believe I can get away with this?
-        Q.add(new NodeDist(sourceIndex, dist[sourceIndex]));
+        Q.add(new NodeWeight(sourceIndex, weight[sourceIndex]));
 
         while (!Q.isEmpty()) {
-            NodeDist curr = Q.poll();
+            NodeWeight curr = Q.poll();
             int u = curr.nodeIndex;
 
-            if (curr.dist > dist[u]) { continue; }
+            if (curr.weight > weight[u]) { continue; }
             if (u == endIndex) { break; }
 
             MapNode node = map.getNodes().get(u);
@@ -283,10 +312,12 @@ public class MapController {
                 int v = node.getConnections().get(i);
 
                 int type = node.getConnectionTypes().get(i);
-                double d = 0;
+                double w = node.getDistances().get(i);
+                double d = w;
 
-                if(type == MapAttraction.CONNECTION_TYPE_WALKWAY) {
-                    d = node.getDistances().get(i);
+                if(type == MapAttraction.CONNECTION_TYPE_TRAIN) {
+                    w /= 3;
+                    d = 0;
                 }
                 else if(type == MapAttraction.CONNECTION_TYPE_PARADE) {
                     LocalDate currentDate = LocalDate.now();
@@ -301,16 +332,17 @@ public class MapController {
                     }
                 }
 
-                double alt = dist[u] + d;
-                if (alt < dist[v]) {
-                    dist[v] = alt;
+                double alt = weight[u] + w;
+                if (alt < weight[v]) {
+                    weight[v] = alt;
+                    dist[v] = dist[u] + d;
                     prev[v] = u;
-                    Q.add(new NodeDist(v, alt));
+                    Q.add(new NodeWeight(v, alt));
                 }
             }
         }
 
-        if(dist[endIndex] == Double.MAX_VALUE) {
+        if(weight[endIndex] == Double.MAX_VALUE) {
             path.clear();
         }
 
@@ -321,8 +353,8 @@ public class MapController {
 
         Collections.reverse(path);
 
-        routeDist = (int)(dist[endIndex] * STEPS_PER_METER);
-        routeETA = (int)(routeDist / STEPS_PER_SECOND);
+        routeDist += (int)(dist[endIndex] * STEPS_PER_METER);
+        routeETA += (int)(routeDist / STEPS_PER_SECOND);
     }
 
     public interface PathEvent {
@@ -341,9 +373,11 @@ public class MapController {
         }
     }
 
-    //TODO: Potentially remove this after displaying wait times is implemented
     public int getAttractionWaitTime(MapAttraction attraction) throws IOException, InterruptedException {
-        return adaptor.getWaitTime(attraction.getLandID(), attraction.getAttractionID());
+        boolean isTrainStation = attraction.getAttractionID() < -1 && attraction.getAttractionID() >= -1 - NUM_TRAIN_STATIONS;
+        int landID = isTrainStation ? TRAIN_STATION_LAND_ID : attraction.getLandID();
+        int attractionID = isTrainStation ? TRAIN_STATION_ATTRACTION_ID : attraction.getAttractionID();
+        return adaptor.getWaitTime(landID, attractionID);
     }
 
     public BufferedImage getMapImage() {
