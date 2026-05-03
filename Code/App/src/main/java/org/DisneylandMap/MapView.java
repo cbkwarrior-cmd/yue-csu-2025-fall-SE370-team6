@@ -115,10 +115,10 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         });
 
         g.setColor(Color.GRAY);
-        g.fillRect(0, 0, MAP_X, WINDOW_WIDTH);
+        g.fillRect(0, 0, MAP_X, WINDOW_WIDTH + WINDOW_BOUNDS_INCREASE);
 
         g.setColor(Color.GRAY);
-        g.fillRect(0, MAP_HEIGHT, WINDOW_WIDTH, WINDOW_HEIGHT - MAP_HEIGHT);
+        g.fillRect(0, MAP_HEIGHT, WINDOW_WIDTH + WINDOW_BOUNDS_INCREASE, WINDOW_HEIGHT - MAP_HEIGHT + WINDOW_BOUNDS_INCREASE);
     }
 
     public void startView() {
@@ -127,7 +127,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         this.addMouseMotionListener(this);
         this.addMouseWheelListener(this);
 
-        this.setBackground(Color.GRAY);
+        this.setBackground(Color.BLACK);
         this.setLayout(null);
 
         final int ENTRIES_PANEL_MARGIN = 15;
