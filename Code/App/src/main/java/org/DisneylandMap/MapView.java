@@ -228,6 +228,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         frame.add(this);
         frame.setVisible(true);
         frame.setResizable(false);
+        frame.setIconImage(controller.getMapImage());
 
         controller.unhighlightAttraction(this);
     }
