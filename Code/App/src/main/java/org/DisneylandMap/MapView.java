@@ -1,4 +1,4 @@
-package org.DisneylandMap;
+package src.main.java.org.DisneylandMap;
 
 import java.awt.BasicStroke;
 import java.awt.BorderLayout;
@@ -41,6 +41,10 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
 
     public static final int ATTRACTION_DIAMETER = 20, ATTRACTION_RADIUS = ATTRACTION_DIAMETER / 2;
 
+    public static final Color GREEN_RGB = new Color(149, 201, 61);
+    public static final Color BLUE_RGB = new Color(37, 150, 190);
+    public static final Color GREY_RGB = new Color(235, 235, 235);
+
     private MapController controller;
 
     private JPanel attractionsPanel = new JPanel();
@@ -54,8 +58,9 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         controller = new MapController(this);
     }
 
-    public void updateRouteButton(Color color, String text) {
-        routeButton.setBackground(color);
+    public void updateRouteButton(Color background_color, Color foreground_color, String text) {
+        routeButton.setBackground(background_color);
+        routeButton.setForeground(foreground_color);
         routeButton.setText(text);
     }
 
@@ -96,7 +101,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
 
         g2.drawImage(controller.getMapImage(), controller.worldToPixelX(-.5), controller.worldToPixelY(-.5), (int)(MAP_WIDTH * controller.getMapScale()), (int)(MAP_HEIGHT * controller.getMapScale()), null);
 
-        g2.setColor(Color.BLUE);
+        g2.setColor(BLUE_RGB);
         float width = 3f;
         BasicStroke stroke = new BasicStroke(width);
         g2.setStroke(stroke);
@@ -108,16 +113,16 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
             int radius = (int)(ATTRACTION_RADIUS * controller.getMapScale());
             int diameter = (int)(ATTRACTION_DIAMETER * controller.getMapScale());
             int drawX = x - radius, drawY = y - radius;
-            g2.setColor(highlighted ? Color.BLUE : Color.BLACK);
+            g2.setColor(highlighted ? BLUE_RGB : Color.BLACK);
             g2.fillOval(drawX, drawY, diameter, diameter);
             g2.setColor(Color.WHITE);
             g2.fillOval(drawX + 3, drawY + 3, diameter - 6, diameter - 6);
         });
 
-        g.setColor(Color.GRAY);
+        g.setColor(Color.WHITE);
         g.fillRect(0, 0, MAP_X, WINDOW_WIDTH + WINDOW_BOUNDS_INCREASE);
 
-        g.setColor(Color.GRAY);
+        g.setColor(Color.WHITE);
         g.fillRect(0, MAP_HEIGHT, WINDOW_WIDTH + WINDOW_BOUNDS_INCREASE, WINDOW_HEIGHT - MAP_HEIGHT + WINDOW_BOUNDS_INCREASE);
     }
 
@@ -136,7 +141,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
 
         this.attractionsPanel = new JPanel(new BorderLayout());
         this.attractionsPanel.setBounds(ENTRIES_PANEL_MARGIN, ENTRIES_PANEL_MARGIN, ENTRIES_PANEL_W, ENTRIES_PANEL_H);
-        this.attractionsPanel.setBackground(Color.WHITE);
+        this.attractionsPanel.setBackground(GREEN_RGB);
 
         routeButton.setBounds(ENTRIES_PANEL_MARGIN, ENTRIES_PANEL_H + ENTRIES_PANEL_MARGIN * 2, ENTRIES_PANEL_W, WINDOW_HEIGHT - ENTRIES_PANEL_H - ENTRIES_PANEL_MARGIN * 5);
         routeButton.addActionListener(e -> controller.handleRouteButton(this));
@@ -149,7 +154,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
             button.setAlignmentX(Component.LEFT_ALIGNMENT);
             button.setPreferredSize(new Dimension(200, 60));
             button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 60));
-            button.setBackground(Color.BLUE);
+            button.setBackground(GREEN_RGB);
             button.setForeground(Color.WHITE);
 
             button.addActionListener(e -> {
@@ -162,6 +167,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         });
 
         JScrollPane scrollPane = new JScrollPane(attractionsButtonPanel, JScrollPane.VERTICAL_SCROLLBAR_ALWAYS, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(20);
         this.attractionsPanel.add(scrollPane, BorderLayout.CENTER);
         this.add(this.attractionsPanel);
 
@@ -170,7 +176,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         JPanel routeInfoPanel = new JPanel(null);
         routeInfoPanel.setLayout(new BoxLayout(routeInfoPanel, BoxLayout.Y_AXIS));
         routeInfoPanel.setBounds(MapView.MAP_X, MapView.MAP_HEIGHT + ENTRIES_PANEL_MARGIN, INFO_PANEL_WIDTH, WINDOW_HEIGHT - ENTRIES_PANEL_H - ENTRIES_PANEL_MARGIN * 5);
-        routeInfoPanel.setBackground(Color.WHITE);
+        routeInfoPanel.setBackground(GREY_RGB);
 
         JLabel routeEtaTitle = new JLabel("ETA:");
         JLabel routeDistTitle = new JLabel("Distance:");
@@ -190,9 +196,10 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         attractionInfoLabel.setLineWrap(true);
         attractionInfoLabel.setWrapStyleWord(true);
         attractionInfoLabel.setEditable(false);
+        attractionInfoLabel.setBackground(GREY_RGB);
         JScrollPane attractionInfoPanel = new JScrollPane(attractionInfoLabel, JScrollPane.VERTICAL_SCROLLBAR_ALWAYS, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         attractionInfoPanel.setBounds(MapView.MAP_X + INFO_PANEL_WIDTH + ENTRIES_PANEL_MARGIN, MapView.MAP_HEIGHT + ENTRIES_PANEL_MARGIN, INFO_PANEL_WIDTH, WINDOW_HEIGHT - ENTRIES_PANEL_H - ENTRIES_PANEL_MARGIN * 5);
-        attractionInfoPanel.setBackground(Color.WHITE);
+        attractionInfoPanel.setBackground(GREY_RGB);
         this.add(attractionInfoPanel);
 
         JButton apiLinkButton = new JButton("Powered by Queue-Times.com");
@@ -200,16 +207,15 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         apiLinkButton.setBorderPainted(false);
         apiLinkButton.setFocusPainted(false);
         apiLinkButton.setOpaque(false);
-        apiLinkButton.setForeground(Color.BLUE);
+        apiLinkButton.setForeground(BLUE_RGB);
         apiLinkButton.setBounds(WINDOW_WIDTH - apiLinkButton.getPreferredSize().width, WINDOW_HEIGHT - 50, apiLinkButton.getPreferredSize().width, 30);
         apiLinkButton.addActionListener(e -> {
             try {
-                Desktop.getDesktop().browse(new URI("https://queue-times.com/"));
-                apiLinkButton.setForeground(Color.MAGENTA);
+                Desktop.getDesktop().browse(new URI("https://queue-times.com/en-US"));
             } catch(URISyntaxException | IOException ex) {
                 ex.printStackTrace();
-                apiLinkButton.setForeground(Color.MAGENTA);
             }
+            apiLinkButton.setForeground(Color.BLACK);
         });
         this.add(apiLinkButton);
 

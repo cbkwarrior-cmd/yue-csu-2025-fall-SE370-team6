@@ -1,4 +1,4 @@
-package org.DisneylandMap;
+package src.main.java.org.DisneylandMap;
 
 import java.io.IOException;
 import java.time.DayOfWeek;
@@ -30,6 +30,11 @@ public class MapController {
     private final int NUM_TRAIN_STATIONS = 4;
     private final int TRAIN_STATION_LAND_ID = 113;
     private final int TRAIN_STATION_ATTRACTION_ID = 674;
+
+    public static final Color GREEN_RGB = new Color(149, 201, 61);
+    public static final Color BLUE_RGB = new Color(37, 150, 190);
+    public static final Color GREY_RGB = new Color(235, 235, 235);
+    public static final Color RED_RGB = new Color(183, 51, 75);
 
     private IQueueTime adaptor;
     private Map map;
@@ -128,17 +133,17 @@ public class MapController {
         switch(uiState) {
             case NAVIGATE: {
                 if(highlightedAttractionID == -1) {
-                    view.updateRouteButton(new Color(178, 178, 178), "Requires Start Point to Route");
+                    view.updateRouteButton(GREY_RGB, Color.BLACK, "Requires Start Point to Route");
                 }
                 else {
-                    view.updateRouteButton(Color.GREEN, "Begin Routing");
+                    view.updateRouteButton(GREEN_RGB, Color.WHITE,"Begin Routing");
                 }
             } break;
             case SELECT_POINT_B: {
-                view.updateRouteButton(new Color(183, 51, 75), "Cancel");
+                view.updateRouteButton(Color.BLACK, Color.WHITE, "Cancel");
             } break;
             case SHOW_PATH: {
-                view.updateRouteButton(new Color(51, 154, 183), "Clear Path");
+                view.updateRouteButton(BLUE_RGB, Color.WHITE, "Clear Path");
             } break;
         }
 

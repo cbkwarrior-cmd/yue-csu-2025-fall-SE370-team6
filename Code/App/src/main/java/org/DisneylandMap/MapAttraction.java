@@ -1,4 +1,4 @@
-package org.DisneylandMap;
+package src.main.java.org.DisneylandMap;
 
 public class MapAttraction extends MapNode {
     public static final int CONNECTION_TYPE_WALKWAY = 0;
