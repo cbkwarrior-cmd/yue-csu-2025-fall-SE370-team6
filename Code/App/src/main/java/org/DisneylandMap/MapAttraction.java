@@ -7,12 +7,14 @@ public class MapAttraction extends MapNode {
 
     private String name;
     private int attractionID, landID;
+    private int closestTrainID;
 
-    public MapAttraction(String name, int attractionID, int landID, double x, double y) {
+    public MapAttraction(String name, int attractionID, int closestTrainID, int landID, double x, double y) {
         super(x, y);
         this.name = name;
         this.attractionID = attractionID;
         this.landID = landID;
+        this.closestTrainID = closestTrainID;
     }
 
     public String getName() {
@@ -25,5 +27,9 @@ public class MapAttraction extends MapNode {
 
     public int getLandID() {
         return landID;
+    }
+
+    public int getClosestTrainID() {
+        return closestTrainID;
     }
 }

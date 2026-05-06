@@ -26,6 +26,7 @@ public class Map {
             while((ln = nodesReader.readLine()) != null) {
                 String name = nodesReader.readLine();
                 int attractionID = Integer.parseInt(nodesReader.readLine());
+                int closestTrainID = Integer.parseInt(nodesReader.readLine());
                 int landID = Integer.parseInt(nodesReader.readLine());
                 double x = Double.parseDouble(nodesReader.readLine());
                 double y = Double.parseDouble(nodesReader.readLine());
@@ -36,7 +37,7 @@ public class Map {
                     node = new MapNode(x, y);
                 }
                 else {
-                    node = new MapAttraction(name, attractionID, landID, x, y);
+                    node = new MapAttraction(name, attractionID, landID, closestTrainID, x, y);
                     attractionsTable.put(attractionID, nodes.size());
                 }
 

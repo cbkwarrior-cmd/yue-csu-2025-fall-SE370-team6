@@ -10,6 +10,7 @@ import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Toolkit;
+import java.awt.event.ItemEvent;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
@@ -22,6 +23,7 @@ import java.util.ArrayList;
 
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -41,6 +43,11 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
 
     public static final int ATTRACTION_DIAMETER = 20, ATTRACTION_RADIUS = ATTRACTION_DIAMETER / 2;
 
+    public static final Color GREEN_RGB = new Color(149, 201, 61);
+    public static final Color BLUE_RGB = new Color(37, 150, 190);
+    public static final Color GREY_RGB = new Color(235, 235, 235);
+    public static final Color RED_RGB = new Color(183, 51, 75);
+
     private MapController controller;
 
     private JPanel attractionsPanel = new JPanel();
@@ -54,8 +61,9 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         controller = new MapController(this);
     }
 
-    public void updateRouteButton(Color color, String text) {
-        routeButton.setBackground(color);
+    public void updateRouteButton(Color backgroundColor, Color foregroundColor, String text) {
+        routeButton.setBackground(backgroundColor);
+        routeButton.setForeground(foregroundColor);
         routeButton.setText(text);
     }
 
@@ -96,7 +104,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
 
         g2.drawImage(controller.getMapImage(), controller.worldToPixelX(-.5), controller.worldToPixelY(-.5), (int)(MAP_WIDTH * controller.getMapScale()), (int)(MAP_HEIGHT * controller.getMapScale()), null);
 
-        g2.setColor(Color.BLUE);
+        g2.setColor(BLUE_RGB);
         float width = 3f;
         BasicStroke stroke = new BasicStroke(width);
         g2.setStroke(stroke);
@@ -108,16 +116,16 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
             int radius = (int)(ATTRACTION_RADIUS * controller.getMapScale());
             int diameter = (int)(ATTRACTION_DIAMETER * controller.getMapScale());
             int drawX = x - radius, drawY = y - radius;
-            g2.setColor(highlighted ? Color.BLUE : Color.BLACK);
+            g2.setColor(highlighted ? BLUE_RGB : Color.BLACK);
             g2.fillOval(drawX, drawY, diameter, diameter);
             g2.setColor(Color.WHITE);
             g2.fillOval(drawX + 3, drawY + 3, diameter - 6, diameter - 6);
         });
 
-        g.setColor(Color.GRAY);
+        g.setColor(Color.WHITE);
         g.fillRect(0, 0, MAP_X, WINDOW_WIDTH + WINDOW_BOUNDS_INCREASE);
 
-        g.setColor(Color.GRAY);
+        g.setColor(Color.WHITE);
         g.fillRect(0, MAP_HEIGHT, WINDOW_WIDTH + WINDOW_BOUNDS_INCREASE, WINDOW_HEIGHT - MAP_HEIGHT + WINDOW_BOUNDS_INCREASE);
     }
 
@@ -136,7 +144,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
 
         this.attractionsPanel = new JPanel(new BorderLayout());
         this.attractionsPanel.setBounds(ENTRIES_PANEL_MARGIN, ENTRIES_PANEL_MARGIN, ENTRIES_PANEL_W, ENTRIES_PANEL_H);
-        this.attractionsPanel.setBackground(Color.WHITE);
+        this.attractionsPanel.setBackground(GREEN_RGB);
 
         routeButton.setBounds(ENTRIES_PANEL_MARGIN, ENTRIES_PANEL_H + ENTRIES_PANEL_MARGIN * 2, ENTRIES_PANEL_W, WINDOW_HEIGHT - ENTRIES_PANEL_H - ENTRIES_PANEL_MARGIN * 5);
         routeButton.addActionListener(e -> controller.handleRouteButton(this));
@@ -149,7 +157,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
             button.setAlignmentX(Component.LEFT_ALIGNMENT);
             button.setPreferredSize(new Dimension(200, 60));
             button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 60));
-            button.setBackground(Color.BLUE);
+            button.setBackground(GREEN_RGB);
             button.setForeground(Color.WHITE);
 
             button.addActionListener(e -> {
@@ -167,32 +175,55 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
 
         final int INFO_PANEL_WIDTH = (MapView.MAP_WIDTH - ENTRIES_PANEL_MARGIN * 2) / 2;
 
-        JPanel routeInfoPanel = new JPanel(null);
+        JPanel routeInfoPanel = new JPanel();
         routeInfoPanel.setLayout(new BoxLayout(routeInfoPanel, BoxLayout.Y_AXIS));
         routeInfoPanel.setBounds(MapView.MAP_X, MapView.MAP_HEIGHT + ENTRIES_PANEL_MARGIN, INFO_PANEL_WIDTH, WINDOW_HEIGHT - ENTRIES_PANEL_H - ENTRIES_PANEL_MARGIN * 5);
-        routeInfoPanel.setBackground(Color.WHITE);
+        routeInfoPanel.setBackground(GREY_RGB);
 
         JLabel routeEtaTitle = new JLabel("ETA:");
         JLabel routeDistTitle = new JLabel("Distance:");
-        routeInfoPanel.add(routeEtaTitle);
-        routeInfoPanel.add(routeEtaLabel);
-        routeInfoPanel.add(routeDistTitle);
-        routeInfoPanel.add(routeDistLabel);
+
+        routeEtaTitle.setAlignmentX(Component.LEFT_ALIGNMENT);
+        routeEtaLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        routeDistTitle.setAlignmentX(Component.LEFT_ALIGNMENT);
+        routeDistLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JPanel preferTrainPanel = new JPanel();
+        preferTrainPanel.setLayout(new BoxLayout(preferTrainPanel, BoxLayout.X_AXIS));
+        preferTrainPanel.setOpaque(false);
+        preferTrainPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel preferTrainLabel = new JLabel("Prefer Trains:");
+        JCheckBox preferTrainCheckBox = new JCheckBox();
+        preferTrainCheckBox.addItemListener(e -> controller.setPreferTrains(e.getStateChange() == ItemEvent.SELECTED));
+
+        preferTrainPanel.add(preferTrainLabel);
+        preferTrainPanel.add(preferTrainCheckBox);
 
         Font infoPanelFont = new Font("Arial", Font.PLAIN, routeInfoPanel.getHeight() / 8);
         routeEtaTitle.setFont(infoPanelFont);
         routeEtaLabel.setFont(infoPanelFont);
         routeDistTitle.setFont(infoPanelFont);
         routeDistLabel.setFont(infoPanelFont);
+        preferTrainLabel.setFont(infoPanelFont);
+
+        routeInfoPanel.add(routeEtaTitle);
+        routeInfoPanel.add(routeEtaLabel);
+        routeInfoPanel.add(routeDistTitle);
+        routeInfoPanel.add(routeDistLabel);
+        routeInfoPanel.add(preferTrainPanel);
+
         this.add(routeInfoPanel);
 
         attractionInfoLabel.setFont(new Font("Arial", Font.PLAIN, 20));
         attractionInfoLabel.setLineWrap(true);
         attractionInfoLabel.setWrapStyleWord(true);
         attractionInfoLabel.setEditable(false);
+
         JScrollPane attractionInfoPanel = new JScrollPane(attractionInfoLabel, JScrollPane.VERTICAL_SCROLLBAR_ALWAYS, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         attractionInfoPanel.setBounds(MapView.MAP_X + INFO_PANEL_WIDTH + ENTRIES_PANEL_MARGIN, MapView.MAP_HEIGHT + ENTRIES_PANEL_MARGIN, INFO_PANEL_WIDTH, WINDOW_HEIGHT - ENTRIES_PANEL_H - ENTRIES_PANEL_MARGIN * 5);
         attractionInfoPanel.setBackground(Color.WHITE);
+        attractionInfoPanel.setBackground(GREY_RGB);
         this.add(attractionInfoPanel);
 
         JButton apiLinkButton = new JButton("Powered by Queue-Times.com");
@@ -200,16 +231,15 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         apiLinkButton.setBorderPainted(false);
         apiLinkButton.setFocusPainted(false);
         apiLinkButton.setOpaque(false);
-        apiLinkButton.setForeground(Color.BLUE);
+        apiLinkButton.setForeground(BLUE_RGB);
         apiLinkButton.setBounds(WINDOW_WIDTH - apiLinkButton.getPreferredSize().width, WINDOW_HEIGHT - 50, apiLinkButton.getPreferredSize().width, 30);
         apiLinkButton.addActionListener(e -> {
             try {
                 Desktop.getDesktop().browse(new URI("https://queue-times.com/"));
-                apiLinkButton.setForeground(Color.MAGENTA);
             } catch(URISyntaxException | IOException ex) {
                 ex.printStackTrace();
-                apiLinkButton.setForeground(Color.MAGENTA);
             }
+            apiLinkButton.setForeground(Color.BLACK);
         });
         this.add(apiLinkButton);
 
@@ -219,6 +249,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         frame.setSize(WINDOW_WIDTH + heightIncrease, WINDOW_HEIGHT + heightIncrease);
         frame.setResizable(false);
         frame.setLocationRelativeTo(null);
+        frame.setIconImage(controller.getMapImage());
         frame.add(this);
         frame.setVisible(true);
         frame.setResizable(false);

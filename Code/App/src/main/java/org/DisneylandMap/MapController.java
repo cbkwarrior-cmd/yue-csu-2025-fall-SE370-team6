@@ -36,17 +36,15 @@ public class MapController {
 
     private int routeETA;
     private int routeDist;
+    private ArrayList<Point.Double> routePath = new ArrayList<>();
+    private boolean preferTrains;
 
     private double cameraX = 0, cameraY = 0;
     private double scale = 1.0;
 
+    private int mouseX, mouseY;
     private double dragXStart, dragYStart;
     private boolean dragging = false;
-
-    private int mouseX, mouseY;
-
-    private int highlightedAttractionID;
-    private ArrayList<Point.Double> path = new ArrayList<>();
 
     private enum UIState {
         NAVIGATE,
@@ -54,6 +52,7 @@ public class MapController {
         SHOW_PATH,
     };
     private UIState uiState = UIState.NAVIGATE;
+    private int highlightedAttractionID;
 
     public MapController(MapView view) {
         this.adaptor = new QueueTimesAdaptor();
@@ -128,17 +127,17 @@ public class MapController {
         switch(uiState) {
             case NAVIGATE: {
                 if(highlightedAttractionID == -1) {
-                    view.updateRouteButton(new Color(178, 178, 178), "Requires Start Point to Route");
+                    view.updateRouteButton(MapView.GREY_RGB, Color.BLACK, "Requires Start Point to Route");
                 }
                 else {
-                    view.updateRouteButton(Color.GREEN, "Begin Routing");
+                    view.updateRouteButton(MapView.GREEN_RGB, Color.WHITE, "Begin Routing");
                 }
             } break;
             case SELECT_POINT_B: {
-                view.updateRouteButton(new Color(183, 51, 75), "Cancel");
+                view.updateRouteButton(Color.BLACK, Color.WHITE, "Cancel");
             } break;
             case SHOW_PATH: {
-                view.updateRouteButton(new Color(51, 154, 183), "Clear Path");
+                view.updateRouteButton(MapView.BLUE_RGB, Color.WHITE, "Clear Path");
             } break;
         }
 
@@ -146,7 +145,7 @@ public class MapController {
             String etaText = "Impossible route";
             String distanceText = "Impossible route";
 
-            if(!path.isEmpty()) {
+            if(!routePath.isEmpty()) {
                 int etaMinutes = routeETA / 60;
 
                 if(etaMinutes == 0) {
@@ -189,9 +188,15 @@ public class MapController {
 
     public void handleAttractionClick(MapView view, int id) {
         if (uiState == UIState.SELECT_POINT_B && highlightedAttractionID != id) {
-            findPath(highlightedAttractionID, id);
+            if(preferTrains && highlightedAttractionID > -1 && id > -1) {
+                findTrainPath(highlightedAttractionID, id);
+            }
+            else {
+                findPath(highlightedAttractionID, id, new int[]{});
+            }
             setUiState(UIState.SHOW_PATH, view);
-        } else {
+        }
+        else {
             highlightAttraction(id, view);
         }
         view.repaint();
@@ -259,8 +264,8 @@ public class MapController {
     }
 
     // Implementation of Dijkstra's algorithm sourced from: https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm
-    public void findPath(int startID, int endID) {
-        path.clear();
+    public void findPath(int startID, int endID, int[] excludedPathTypes) {
+        routePath.clear();
 
         LocalDate currentDate = LocalDate.now();
         boolean isWeekend = currentDate.getDayOfWeek().getValue() >= DayOfWeek.FRIDAY.getValue();
@@ -314,9 +319,18 @@ public class MapController {
             MapNode node = map.getNodes().get(u);
 
             for (int i = 0; i < node.getConnections().size(); i++) {
+                int type = node.getConnectionTypes().get(i);
+                boolean typeExcluded = false;
+                for (int t : excludedPathTypes) {
+                    if (t == type) {
+                        typeExcluded = true;
+                        break;
+                    }
+                }
+                if (typeExcluded) { continue; }
+
                 int v = node.getConnections().get(i);
                 double w = node.getDistances().get(i);
-                int type = node.getConnectionTypes().get(i);
 
                 double d = w * STEPS_PER_METER;
                 double t;
@@ -344,18 +358,52 @@ public class MapController {
         }
 
         if(eta[endIndex] == Double.MAX_VALUE) {
-            path.clear();
+            routePath.clear();
         }
 
         for (int i = endIndex; i != -1; i = prev[i]) {
             MapNode node = map.getNodes().get(i);
-            path.add(new Point.Double(node.getX(), node.getY()));
+            routePath.add(new Point.Double(node.getX(), node.getY()));
         }
 
-        Collections.reverse(path);
+        Collections.reverse(routePath);
 
         routeDist = (int)(dist[endIndex]);
         routeETA = (int)(eta[endIndex]);
+    }
+
+    public void findTrainPath(int startAttractionID, int endAttractionID) {
+        int startTrain = map.getAttractionFromID(startAttractionID).getClosestTrainID();
+        int endTrain = map.getAttractionFromID(endAttractionID).getClosestTrainID();
+
+        System.out.println("" + startAttractionID + " " + endAttractionID + " " + startTrain + " " + endTrain);
+
+        int combinedETA = 0, combinedDist = 0;
+        ArrayList<Point.Double> combinedPath = new ArrayList<>();
+
+        findPath(startAttractionID, startTrain, new int[]{MapAttraction.CONNECTION_TYPE_TRAIN});
+        combinedETA += routeETA;
+        combinedDist += routeDist;
+        combinedPath.addAll(routePath);
+
+        findPath(startTrain, endTrain, new int[]{MapAttraction.CONNECTION_TYPE_WALKWAY, MapAttraction.CONNECTION_TYPE_PARADE});
+        combinedETA += routeETA;
+        combinedDist += routeDist;
+        combinedPath.addAll(routePath);
+
+        findPath(endTrain, endAttractionID, new int[]{MapAttraction.CONNECTION_TYPE_TRAIN});
+        combinedETA += routeETA;
+        combinedDist += routeDist;
+        combinedPath.addAll(routePath);
+
+        routeETA = combinedETA;
+        routeDist = combinedDist;
+        routePath.clear();
+        routePath.addAll(combinedPath);
+    }
+
+    public void setPreferTrains(boolean preferTrains) {
+        this.preferTrains = preferTrains;
     }
 
     public interface PathEvent {
@@ -364,11 +412,11 @@ public class MapController {
 
     public void forEachPathPoint(PathEvent e) {
         if(uiState == UIState.SHOW_PATH) {
-            for(int i = 0; i < path.size() - 1; i++) {
-                int x0 = worldToPixelX(path.get(i).x);
-                int y0 = worldToPixelY(path.get(i).y);
-                int x1 = worldToPixelX(path.get(i + 1).x);
-                int y1 = worldToPixelY(path.get(i + 1).y);
+            for(int i = 0; i < routePath.size() - 1; i++) {
+                int x0 = worldToPixelX(routePath.get(i).x);
+                int y0 = worldToPixelY(routePath.get(i).y);
+                int x1 = worldToPixelX(routePath.get(i + 1).x);
+                int y1 = worldToPixelY(routePath.get(i + 1).y);
                 e.execute(x0, y0, x1, y1);
             }
         }
