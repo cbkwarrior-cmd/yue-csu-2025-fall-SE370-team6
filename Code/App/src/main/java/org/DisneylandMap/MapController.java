@@ -359,6 +359,7 @@ public class MapController {
 
         if(eta[endIndex] == Double.MAX_VALUE) {
             routePath.clear();
+            return;
         }
 
         for (int i = endIndex; i != -1; i = prev[i]) {
@@ -376,25 +377,28 @@ public class MapController {
         int startTrain = map.getAttractionFromID(startAttractionID).getClosestTrainID();
         int endTrain = map.getAttractionFromID(endAttractionID).getClosestTrainID();
 
-        System.out.println("" + startAttractionID + " " + endAttractionID + " " + startTrain + " " + endTrain);
-
         int combinedETA = 0, combinedDist = 0;
         ArrayList<Point.Double> combinedPath = new ArrayList<>();
 
         findPath(startAttractionID, startTrain, new int[]{MapAttraction.CONNECTION_TYPE_TRAIN});
+        if(routePath.isEmpty()) { return; }
         combinedETA += routeETA;
         combinedDist += routeDist;
         combinedPath.addAll(routePath);
 
         findPath(startTrain, endTrain, new int[]{MapAttraction.CONNECTION_TYPE_WALKWAY, MapAttraction.CONNECTION_TYPE_PARADE});
+        if(routePath.isEmpty()) { return; }
         combinedETA += routeETA;
         combinedDist += routeDist;
         combinedPath.addAll(routePath);
+        System.out.println("" + routeETA);
 
         findPath(endTrain, endAttractionID, new int[]{MapAttraction.CONNECTION_TYPE_TRAIN});
+        if(routePath.isEmpty()) { return; }
         combinedETA += routeETA;
         combinedDist += routeDist;
         combinedPath.addAll(routePath);
+        System.out.println("" + routeETA);
 
         routeETA = combinedETA;
         routeDist = combinedDist;
