@@ -262,10 +262,6 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         attractionInfoLabel.setCaretPosition(0);
     }
 
-    public int getAttractionRadius() {
-        return ATTRACTION_RADIUS;
-    }
-
     public static void main(String[] args) {
         MapView mapView = new MapView();
         mapView.startView();

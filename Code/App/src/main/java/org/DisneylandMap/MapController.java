@@ -15,8 +15,6 @@ import java.awt.image.BufferedImage;
 import javax.swing.SwingUtilities;
 
 public class MapController {
-    private static final int ATTRACTION_ID_INVALID = -1;
-
     private static final int WAIT_TIME_CLOSED = -1;
     private static final int WAIT_TIME_FAILED = -2;
 
@@ -117,7 +115,7 @@ public class MapController {
     }
 
     public void unhighlightAttraction(MapView view) {
-        this.highlightedAttractionID = ATTRACTION_ID_INVALID;
+        this.highlightedAttractionID = MapAttraction.ATTRACTION_ID_INVALID;
 
         view.setAttractionInfo("Press Node to View Attraction Info");
         setUiState(uiState, view);
@@ -169,7 +167,7 @@ public class MapController {
 
         switch(uiState) {
             case NAVIGATE -> {
-                if(highlightedAttractionID == ATTRACTION_ID_INVALID) {
+                if(highlightedAttractionID == MapAttraction.ATTRACTION_ID_INVALID) {
                     view.updateRouteButton(MapView.GREY_RGB, Color.BLACK, "Requires Start Point to Route");
                 }
                 else {
@@ -200,7 +198,7 @@ public class MapController {
     public void handleRouteButton(MapView view) {
         switch(uiState) {
             case NAVIGATE -> {
-                if(highlightedAttractionID != ATTRACTION_ID_INVALID) {
+                if(highlightedAttractionID != MapAttraction.ATTRACTION_ID_INVALID) {
                     setUiState(UIState.SELECT_POINT_B, view);
                 }
             }
@@ -244,7 +242,7 @@ public class MapController {
                 unhighlightAttraction(view);
             }
 
-            double radius = view.getAttractionRadius() * scale;
+            double radius = MapView.ATTRACTION_RADIUS * scale;
 
             forEachAttraction(view, (x, y, id, name, highlighted) -> {
                 double dx = mouseX - x;
@@ -342,7 +340,7 @@ public class MapController {
         for(int i = 0; i < map.getNodes().size(); i++) {
             eta[i] = Double.MAX_VALUE;
             dist[i] = 0;
-            prev[i] = -1;
+            prev[i] = MapAttraction.ATTRACTION_ID_INVALID;
         }
         eta[sourceIndex] = 0;
         // I believe I can get away with this?
@@ -372,11 +370,11 @@ public class MapController {
                 double dSteps = dMeters * STEPS_PER_METER;
                 double t;
 
-                if (type == MapAttraction.CONNECTION_TYPE_TRAIN) {
+                if (type == MapNode.CONNECTION_TYPE_TRAIN) {
                     t = trainWaitTime + (dMeters / 3) * STEPS_PER_METER / STEPS_PER_SECOND;
                     dSteps = 0;
                 }
-                else if (type == MapAttraction.CONNECTION_TYPE_PARADE
+                else if (type == MapNode.CONNECTION_TYPE_PARADE
                     && currentTime.isAfter(startTime)
                     && currentTime.isBefore(endTime))
                 {
@@ -400,7 +398,7 @@ public class MapController {
             return result;
         }
 
-        for (int i = endIndex; i != -1; i = prev[i]) {
+        for (int i = endIndex; i != MapAttraction.ATTRACTION_ID_INVALID; i = prev[i]) {
             MapNode node = map.getNodes().get(i);
             result.path.add(new Point.Double(node.getX(), node.getY()));
         }
@@ -417,13 +415,13 @@ public class MapController {
 
         Route combined = new Route();
 
-        Route walkToTrain = findPath(startAttractionID, startTrain, new int[]{MapAttraction.CONNECTION_TYPE_TRAIN});
+        Route walkToTrain = findPath(startAttractionID, startTrain, new int[]{MapNode.CONNECTION_TYPE_TRAIN});
         if(!walkToTrain.exists()) { return combined; }
 
-        Route trainToTrain = findPath(startTrain, endTrain, new int[]{MapAttraction.CONNECTION_TYPE_TRAIN});
+        Route trainToTrain = findPath(startTrain, endTrain, new int[]{MapNode.CONNECTION_TYPE_TRAIN});
         if(!trainToTrain.exists()) { return combined; }
 
-        Route walkFromTrain = findPath(endTrain, endAttractionID, new int[]{MapAttraction.CONNECTION_TYPE_TRAIN});
+        Route walkFromTrain = findPath(endTrain, endAttractionID, new int[]{MapNode.CONNECTION_TYPE_TRAIN});
         if(!walkFromTrain.exists()) { return combined; }
 
         combined.eta = walkToTrain.eta + trainToTrain.eta + walkFromTrain.eta;
@@ -459,8 +457,8 @@ public class MapController {
     }
 
     public int getAttractionWaitTime(MapAttraction attraction) throws IOException, InterruptedException {
-        boolean isTrainStation = attraction.getAttractionID() < -1
-            && attraction.getAttractionID() >= -1 - NUM_TRAIN_STATIONS;
+        boolean isTrainStation = attraction.getAttractionID() < MapAttraction.ATTRACTION_ID_INVALID
+            && attraction.getAttractionID() >= MapAttraction.ATTRACTION_ID_INVALID - NUM_TRAIN_STATIONS;
 
         return isTrainStation ? getTrainWaitTime()
             : adaptor.getWaitTime(attraction.getLandID(), attraction.getAttractionID());

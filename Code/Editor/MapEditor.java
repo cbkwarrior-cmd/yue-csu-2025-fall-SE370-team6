@@ -23,6 +23,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.PriorityQueue;
 import java.util.Stack;
 
 import javax.imageio.ImageIO;
@@ -56,11 +57,15 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
     static final int CONNECTION_TYPE_TRAIN = 1;
     static final int CONNECTION_TYPE_PARADE = 2;
 
+    static final int NUM_TRAIN_STATIONS = 4;
+    static int[] trainIDToIndex;
+
     static int connectionType = CONNECTION_TYPE_WALKWAY;
 
     private class Node {
         public int attractionID;
         public int landID;
+        public int closestTrainID;
         public double x, y;
         public String name;
         public ArrayList<Integer> connections;
@@ -120,6 +125,7 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
         Node n = new Node();
         n.attractionID = -1;
         n.landID = -1;
+        n.closestTrainID = -1;
         n.x = pixelToWorldX(mouseX);
         n.y = pixelToWorldY(mouseY);
         n.name = "";
@@ -147,6 +153,9 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
     }
 
     public void mousePressed(MouseEvent e) {
+        mouseX = e.getX();
+        mouseY = e.getY();
+
         if(SwingUtilities.isRightMouseButton(e)) {
             dragXStart = pixelToWorldX(e.getX());
             dragYStart = pixelToWorldY(e.getY());
@@ -169,6 +178,9 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
     }
 
     public void mouseDragged(MouseEvent e) {
+        mouseX = e.getX();
+        mouseY = e.getY();
+
         if(dragging) {
             double bounds = -1.0 / (scale * 2.0);
             cameraX = Math.clamp(dragXStart + cameraX - pixelToWorldX(e.getX()), bounds, (1.0 + bounds));
@@ -183,6 +195,9 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
     }
 
     public void mouseWheelMoved(MouseWheelEvent e) {
+        mouseX = e.getX();
+        mouseY = e.getY();
+
         if(e.getWheelRotation() > 0) {
             cameraX -= .5 / scale;
             cameraY -= .5 / scale;
@@ -218,6 +233,7 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
             } break;
             case KeyEvent.VK_Z: {
                 if(undoStack.isEmpty()) { break; }
+
                 switch(EditorMode.fromCode(undoStack.pop())) {
                     case EditorMode.MODE_ATTRACTION_PLACE: {
                         nodes.removeLast();
@@ -243,6 +259,7 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
                         wr.write(node.name + "\n");
                         wr.write("" + node.attractionID + "\n");
                         wr.write("" + node.landID + "\n");
+                        wr.write("" + node.closestTrainID + "\n");
                         wr.write("" + node.x + "\n");
                         wr.write("" + node.y + "\n");
                         for (Integer c : node.connections) {
@@ -312,6 +329,79 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
             c.setEnabled(enabled);
             c.setVisible(enabled);
         }
+    }
+
+    public double distanceToNode(int startIndex, int endIndex) {
+        double[] dist = new double[nodes.size()];
+        int[] prev = new int[nodes.size()];
+
+        class NodeDist {
+            int nodeIndex;
+            double dist;
+
+            NodeDist(int nodeIndex, double dist) {
+                this.nodeIndex = nodeIndex;
+                this.dist = dist;
+            }
+        }
+
+        PriorityQueue<NodeDist> Q = new PriorityQueue<>((a, b) -> Double.compare(a.dist, b.dist));
+
+        for(int i = 0; i < nodes.size(); i++) {
+            dist[i] = Double.MAX_VALUE;
+            prev[i] = -1;
+        }
+        dist[startIndex] = 0;
+        Q.add(new NodeDist(startIndex, dist[startIndex]));
+
+        while (!Q.isEmpty()) {
+            NodeDist curr = Q.poll();
+            int u = curr.nodeIndex;
+
+            if (curr.dist > dist[u]) { continue; }
+            if (u == endIndex) { break; }
+
+            Node node = nodes.get(u);
+
+            for (int i = 0; i < node.connections.size(); i++) {
+                int type = node.connectionTypes.get(i);
+                if(type == CONNECTION_TYPE_TRAIN) { continue; }
+
+                int v = node.connections.get(i);
+                double d = node.distances.get(i);
+
+                double alt = dist[u] + d;
+                if (alt < dist[v]) {
+                    dist[v] = alt;
+                    dist[v] = dist[u] + d;
+                    prev[v] = u;
+                    Q.add(new NodeDist(v, alt));
+                }
+            }
+        }
+
+        if(dist[endIndex] == Double.MAX_VALUE) {
+            System.out.println("Failed to find path for node: " + nodes.get(startIndex).name + ", index: " + startIndex);
+        }
+
+        return dist[endIndex];
+    }
+
+    private int indexOfTrainID(int id) {
+        return trainIDToIndex[-id - 2];
+    }
+
+    private int closestTrainToAttraction(int attractionIndex) {
+        int trainID = -1;
+        double closestDistance = Double.MAX_VALUE;
+        for(int t = -2; t > -2 - NUM_TRAIN_STATIONS; t--) {
+            double d = distanceToNode(attractionIndex, indexOfTrainID(t));
+            if(d < closestDistance) {
+                closestDistance = d;
+                trainID = t;
+            }
+        }
+        return trainID;
     }
 
     @Override
@@ -398,6 +488,8 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
             e.printStackTrace();
         }
 
+        trainIDToIndex = new int[NUM_TRAIN_STATIONS];
+
         try {
             BufferedReader r = new BufferedReader(new FileReader(NODES_FILE_NAME));
 
@@ -407,6 +499,7 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
                 n.name = r.readLine();
                 n.attractionID = Integer.parseInt(r.readLine());
                 n.landID = Integer.parseInt(r.readLine());
+                n.closestTrainID = Integer.parseInt(r.readLine());
                 n.x = Double.parseDouble(r.readLine());
                 n.y = Double.parseDouble(r.readLine());
                 n.connections = new ArrayList<>();
@@ -421,6 +514,11 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
                 while(!(ln = r.readLine()).contains("|")) {
                     n.connectionTypes.add(Integer.parseInt(ln));
                 }
+
+                if(n.attractionID <= -2) {
+                    trainIDToIndex[-n.attractionID - 2] = nodes.size();
+                }
+
                 nodes.add(n);
             }
 
@@ -428,6 +526,11 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
         }
         catch(IOException ex) {
             System.out.println("Missing nodes.txt, assuming empty");
+        }
+
+        for(int i = 0; i < nodes.size(); i++) {
+            if(nodes.get(i).attractionID <= -1) { continue; }
+            nodes.get(i).closestTrainID = closestTrainToAttraction(i);
         }
 
         this.setFocusable(true);

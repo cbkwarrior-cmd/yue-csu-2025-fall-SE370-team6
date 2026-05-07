@@ -33,7 +33,7 @@ public class Map {
 
                 MapNode node;
 
-                if(attractionID == -1) {
+                if(attractionID == MapAttraction.ATTRACTION_ID_INVALID) {
                     node = new MapNode(x, y);
                 }
                 else {
