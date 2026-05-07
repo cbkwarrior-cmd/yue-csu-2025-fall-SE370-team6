@@ -15,6 +15,11 @@ import java.awt.image.BufferedImage;
 import javax.swing.SwingUtilities;
 
 public class MapController {
+    private static final int ATTRACTION_ID_INVALID = -1;
+
+    private static final int WAIT_TIME_CLOSED = -1;
+    private static final int WAIT_TIME_FAILED = -2;
+
     private final String MAP_IMAGE_PATH = "map.jpeg";
     private final String MAP_NODES_PATH = "nodes.txt";
 
@@ -34,9 +39,7 @@ public class MapController {
     private IQueueTime adaptor;
     private Map map;
 
-    private int routeETA;
-    private int routeDist;
-    private ArrayList<Point.Double> routePath = new ArrayList<>();
+    private Route currentRoute = new Route();
     private boolean preferTrains;
 
     private double cameraX = 0, cameraY = 0;
@@ -50,9 +53,19 @@ public class MapController {
         NAVIGATE,
         SELECT_POINT_B,
         SHOW_PATH,
-    };
+    }
     private UIState uiState = UIState.NAVIGATE;
     private int highlightedAttractionID;
+
+    private static class Route {
+        int eta;
+        int distance;
+        ArrayList<Point.Double> path = new ArrayList<>();
+
+        boolean exists() {
+            return !path.isEmpty();
+        }
+    }
 
     public MapController(MapView view) {
         this.adaptor = new QueueTimesAdaptor();
@@ -78,28 +91,34 @@ public class MapController {
 
     private void highlightAttraction(int id, MapView view) {
         this.highlightedAttractionID = id;
+
         try {
             MapAttraction attraction = map.getAttractionFromID(highlightedAttractionID);
+
             String info = "" + attraction.getName() + ":\n";
             int waitTimeMinutes = getAttractionWaitTime(attraction);
-            if(waitTimeMinutes == -2) {
-                info += "Error: Failed to get wait time\n";
+
+            if(waitTimeMinutes == WAIT_TIME_FAILED) {
+                info += "Error: Failed to get wait time";
             }
-            else if(waitTimeMinutes == -1) {
+            else if(waitTimeMinutes == WAIT_TIME_CLOSED) {
                 info += "This attraction is closed.";
             }
             else {
-                info += "Wait Time: " + waitTimeMinutes + " Minutes\n";
+                info += "Wait Time: " + waitTimeMinutes + " Minutes.";
             }
+
             view.setAttractionInfo(info);
         } catch(IOException | InterruptedException e) {
             e.printStackTrace();
         }
+
         setUiState(uiState, view);
     }
 
     public void unhighlightAttraction(MapView view) {
-        this.highlightedAttractionID = -1;
+        this.highlightedAttractionID = ATTRACTION_ID_INVALID;
+
         view.setAttractionInfo("Press Node to View Attraction Info");
         setUiState(uiState, view);
     }
@@ -110,102 +129,114 @@ public class MapController {
 
     public void forEachAttraction(MapView view, AttractionEvent e) {
         map.forEachAttraction((id, attraction) -> {
+
             int x = worldToPixelX(attraction.getX());
             int y = worldToPixelY(attraction.getY());
 
-            if(x < MapView.MAP_X - MapView.ATTRACTION_DIAMETER || x >= MapView.MAP_X + MapView.MAP_WIDTH + MapView.ATTRACTION_DIAMETER || y < MapView.MAP_Y - MapView.ATTRACTION_DIAMETER || y >= MapView.MAP_Y + MapView.MAP_HEIGHT + MapView.ATTRACTION_DIAMETER) {
-                return;
+            if(x >= MapView.MAP_X - MapView.ATTRACTION_DIAMETER
+                && x < MapView.MAP_X + MapView.MAP_WIDTH + MapView.ATTRACTION_DIAMETER
+                && y >= MapView.MAP_Y - MapView.ATTRACTION_DIAMETER
+                && y < MapView.MAP_Y + MapView.MAP_HEIGHT + MapView.ATTRACTION_DIAMETER
+            ) {
+                e.execute(x, y, id, attraction.getName(), id == highlightedAttractionID);
             }
-
-            e.execute(x, y, id, attraction.getName(), id == highlightedAttractionID);
         });
+    }
+
+    private String formatETA() {
+        String etaText = "";
+        int etaMinutes = currentRoute.eta / 60;
+
+        if(etaMinutes == 0) {
+            etaText = "" + currentRoute.eta + " sec" + (currentRoute.eta == 1 ? "" : "s");
+        }
+        else {
+            int etaHours = etaMinutes / 60;
+
+            if(etaHours == 0) {
+                etaText = "" + etaMinutes + " min" + (etaMinutes == 1 ? "" : "s");
+            }
+            else {
+                etaText = "" + etaHours + " hr" + (etaHours == 1 ? "" : "s") + " " + etaText;
+            }
+        }
+
+        return etaText;
     }
 
     private void setUiState(UIState newState, MapView view) {
         this.uiState = newState;
 
         switch(uiState) {
-            case NAVIGATE: {
-                if(highlightedAttractionID == -1) {
+            case NAVIGATE -> {
+                if(highlightedAttractionID == ATTRACTION_ID_INVALID) {
                     view.updateRouteButton(MapView.GREY_RGB, Color.BLACK, "Requires Start Point to Route");
                 }
                 else {
                     view.updateRouteButton(MapView.GREEN_RGB, Color.WHITE, "Begin Routing");
                 }
-            } break;
-            case SELECT_POINT_B: {
-                view.updateRouteButton(Color.BLACK, Color.WHITE, "Cancel");
-            } break;
-            case SHOW_PATH: {
-                view.updateRouteButton(MapView.BLUE_RGB, Color.WHITE, "Clear Path");
-            } break;
-        }
-
-        if(this.uiState == UIState.SHOW_PATH) {
-            String etaText = "Impossible route";
-            String distanceText = "Impossible route";
-
-            if(!routePath.isEmpty()) {
-                int etaMinutes = routeETA / 60;
-
-                if(etaMinutes == 0) {
-                    etaText = "" + routeETA + " sec" + (routeETA == 1 ? "" : "s");
-                }
-                else {
-                    etaText = "" + etaMinutes + " min" + (etaMinutes == 1 ? "" : "s");
-
-                    int etaHours = etaMinutes / 60;
-                    if(etaHours != 0) {
-                        etaText = "" + etaHours + " hr" + (etaHours == 1 ? "" : "s") + " " + etaText;
-                    }
-                }
-
-                distanceText = "" + routeDist + " steps";
+                view.updateRouteLabels("N/A", "N/A");
             }
+            case SELECT_POINT_B -> {
+                view.updateRouteButton(Color.BLACK, Color.WHITE, "Cancel");
+                view.updateRouteLabels("N/A", "N/A");
+            }
+            case SHOW_PATH -> {
+                view.updateRouteButton(MapView.BLUE_RGB, Color.WHITE, "Clear Path");
 
-            view.updateRouteLabels(etaText, distanceText);
-        }
-        else {
-            view.updateRouteLabels("N/A", "N/A");
+                String etaText = "Impossible route";
+                String distanceText = "Impossible route";
+
+                if(currentRoute.exists()) {
+                    etaText = formatETA();
+                    distanceText = "" + currentRoute.distance + " steps";
+                }
+
+                view.updateRouteLabels(etaText, distanceText);
+            }
         }
     }
 
     public void handleRouteButton(MapView view) {
-        switch (uiState) {
-            case NAVIGATE: {
-                if (highlightedAttractionID == -1) { break; }
-                setUiState(UIState.SELECT_POINT_B, view);
-            } break;
-            case SELECT_POINT_B: {
+        switch(uiState) {
+            case NAVIGATE -> {
+                if(highlightedAttractionID != ATTRACTION_ID_INVALID) {
+                    setUiState(UIState.SELECT_POINT_B, view);
+                }
+            }
+            case SELECT_POINT_B ->
                 setUiState(UIState.NAVIGATE, view);
-            } break;
-            case SHOW_PATH: {
+            case SHOW_PATH -> {
                 setUiState(UIState.NAVIGATE, view);
-            } break;
+            }
         }
+
         view.repaint();
     }
 
     public void handleAttractionClick(MapView view, int id) {
-        if (uiState == UIState.SELECT_POINT_B && highlightedAttractionID != id) {
-            if(preferTrains && highlightedAttractionID > -1 && id > -1) {
-                findTrainPath(highlightedAttractionID, id);
-            }
-            else {
-                findPath(highlightedAttractionID, id, new int[]{});
-            }
+        if(uiState == UIState.SELECT_POINT_B && highlightedAttractionID != id) {
+            currentRoute = preferTrains
+                ? findTrainPath(highlightedAttractionID, id)
+                : findPath(highlightedAttractionID, id, new int[]{});
+
             setUiState(UIState.SHOW_PATH, view);
         }
         else {
             highlightAttraction(id, view);
         }
+
         view.repaint();
     }
 
     public void handleMousePress(MouseEvent e, MapView view) {
-        if(SwingUtilities.isRightMouseButton(e) && e.getX() >= MapView.MAP_X && e.getY() < MapView.MAP_HEIGHT) {
+        if(SwingUtilities.isRightMouseButton(e)
+            && e.getX() >= MapView.MAP_X
+            && e.getY() < MapView.MAP_HEIGHT
+        ) {
             dragXStart = pixelToWorldX(e.getX());
             dragYStart = pixelToWorldY(e.getY());
+
             dragging = true;
         }
         else if(SwingUtilities.isLeftMouseButton(e)) {
@@ -213,15 +244,18 @@ public class MapController {
                 unhighlightAttraction(view);
             }
 
-            forEachAttraction(view, (x, y, id, name, highlighted) -> {
-                double dx = mouseX - x, dy = mouseY - y;
-                double r = view.getAttractionRadius() * scale;
+            double radius = view.getAttractionRadius() * scale;
 
-                if(dx * dx + dy * dy < r * r) {
+            forEachAttraction(view, (x, y, id, name, highlighted) -> {
+                double dx = mouseX - x;
+                double dy = mouseY - y;
+
+                if(dx * dx + dy * dy < radius * radius) {
                     handleAttractionClick(view, id);
                 }
             });
         }
+
         view.repaint();
     }
 
@@ -232,9 +266,11 @@ public class MapController {
     public void handleMouseDrag(MapView view) {
         if(dragging) {
             double bounds = -1.0 / (scale * 2.0);
+
             cameraX = Math.clamp(dragXStart + cameraX - pixelToWorldX(mouseX), bounds, (1.0 + bounds));
             cameraY = Math.clamp(dragYStart + cameraY - pixelToWorldY(mouseY), bounds, (1.0 + bounds));
         }
+
         view.repaint();
     }
 
@@ -251,21 +287,24 @@ public class MapController {
                 scale *= .5;
             }
         }
-        else if(scale <= 4) {
-            scale *= 2;
-            cameraX += .5 / scale;
-            cameraY += .5 / scale;
+        else {
+            if(scale <= 4) {
+                scale *= 2;
+                cameraX += .5 / scale;
+                cameraY += .5 / scale;
+            }
         }
 
         double bounds = -1.0 / (scale * 2.0);
-        this.cameraX = Math.clamp(cameraX, bounds, (1.0 + bounds));
-        this.cameraY = Math.clamp(cameraY, bounds, (1.0 + bounds));
+
+        cameraX = Math.clamp(cameraX, bounds, (1.0 + bounds));
+        cameraY = Math.clamp(cameraY, bounds, (1.0 + bounds));
+
         view.repaint();
     }
 
-    // Implementation of Dijkstra's algorithm sourced from: https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm
-    public void findPath(int startID, int endID, int[] excludedPathTypes) {
-        routePath.clear();
+    public Route findPath(int startID, int endID, int[] excludedPathTypes) {
+        Route result = new Route();
 
         LocalDate currentDate = LocalDate.now();
         boolean isWeekend = currentDate.getDayOfWeek().getValue() >= DayOfWeek.FRIDAY.getValue();
@@ -314,43 +353,43 @@ public class MapController {
             int u = curr.nodeIndex;
 
             if (curr.eta > eta[u]) { continue; }
-            if (u == endIndex) { break; }
+            if (u == endIndex)     { break; }
 
             MapNode node = map.getNodes().get(u);
 
             for (int i = 0; i < node.getConnections().size(); i++) {
                 int type = node.getConnectionTypes().get(i);
+
                 boolean typeExcluded = false;
                 for (int t : excludedPathTypes) {
-                    if (t == type) {
-                        typeExcluded = true;
-                        break;
-                    }
+                    if(t == type) { typeExcluded = true; break; }
                 }
-                if (typeExcluded) { continue; }
+                if(typeExcluded) { continue; }
 
                 int v = node.getConnections().get(i);
-                double w = node.getDistances().get(i);
+                double dMeters = node.getDistances().get(i);
 
-                double d = w * STEPS_PER_METER;
+                double dSteps = dMeters * STEPS_PER_METER;
                 double t;
 
                 if (type == MapAttraction.CONNECTION_TYPE_TRAIN) {
-                    t = trainWaitTime + (w / 3) * STEPS_PER_METER / STEPS_PER_SECOND;
-                    d = 0;
+                    t = trainWaitTime + (dMeters / 3) * STEPS_PER_METER / STEPS_PER_SECOND;
+                    dSteps = 0;
                 }
                 else if (type == MapAttraction.CONNECTION_TYPE_PARADE
-                        && currentTime.isAfter(startTime) && currentTime.isBefore(endTime)) {
+                    && currentTime.isAfter(startTime)
+                    && currentTime.isBefore(endTime))
+                {
                     continue;
                 }
                 else {
-                    t = w * STEPS_PER_METER / STEPS_PER_SECOND;
+                    t = dMeters * STEPS_PER_METER / STEPS_PER_SECOND;
                 }
 
                 double alt = eta[u] + t;
                 if (alt < eta[v]) {
                     eta[v] = alt;
-                    dist[v] = dist[u] + d;
+                    dist[v] = dist[u] + dSteps;
                     prev[v] = u;
                     Q.add(new NodeETA(v, alt));
                 }
@@ -358,52 +397,43 @@ public class MapController {
         }
 
         if(eta[endIndex] == Double.MAX_VALUE) {
-            routePath.clear();
-            return;
+            return result;
         }
 
         for (int i = endIndex; i != -1; i = prev[i]) {
             MapNode node = map.getNodes().get(i);
-            routePath.add(new Point.Double(node.getX(), node.getY()));
+            result.path.add(new Point.Double(node.getX(), node.getY()));
         }
+        Collections.reverse(result.path);
+        result.distance = (int)(dist[endIndex]);
+        result.eta = (int)(eta[endIndex]);
 
-        Collections.reverse(routePath);
-
-        routeDist = (int)(dist[endIndex]);
-        routeETA = (int)(eta[endIndex]);
+        return result;
     }
 
-    public void findTrainPath(int startAttractionID, int endAttractionID) {
+    public Route findTrainPath(int startAttractionID, int endAttractionID) {
         int startTrain = map.getAttractionFromID(startAttractionID).getClosestTrainID();
         int endTrain = map.getAttractionFromID(endAttractionID).getClosestTrainID();
 
-        int combinedETA = 0, combinedDist = 0;
-        ArrayList<Point.Double> combinedPath = new ArrayList<>();
+        Route combined = new Route();
 
-        findPath(startAttractionID, startTrain, new int[]{MapAttraction.CONNECTION_TYPE_TRAIN});
-        if(routePath.isEmpty()) { return; }
-        combinedETA += routeETA;
-        combinedDist += routeDist;
-        combinedPath.addAll(routePath);
+        Route walkToTrain = findPath(startAttractionID, startTrain, new int[]{MapAttraction.CONNECTION_TYPE_TRAIN});
+        if(!walkToTrain.exists()) { return combined; }
 
-        findPath(startTrain, endTrain, new int[]{MapAttraction.CONNECTION_TYPE_WALKWAY, MapAttraction.CONNECTION_TYPE_PARADE});
-        if(routePath.isEmpty()) { return; }
-        combinedETA += routeETA;
-        combinedDist += routeDist;
-        combinedPath.addAll(routePath);
-        System.out.println("" + routeETA);
+        Route trainToTrain = findPath(startTrain, endTrain, new int[]{MapAttraction.CONNECTION_TYPE_TRAIN});
+        if(!trainToTrain.exists()) { return combined; }
 
-        findPath(endTrain, endAttractionID, new int[]{MapAttraction.CONNECTION_TYPE_TRAIN});
-        if(routePath.isEmpty()) { return; }
-        combinedETA += routeETA;
-        combinedDist += routeDist;
-        combinedPath.addAll(routePath);
-        System.out.println("" + routeETA);
+        Route walkFromTrain = findPath(endTrain, endAttractionID, new int[]{MapAttraction.CONNECTION_TYPE_TRAIN});
+        if(!walkFromTrain.exists()) { return combined; }
 
-        routeETA = combinedETA;
-        routeDist = combinedDist;
-        routePath.clear();
-        routePath.addAll(combinedPath);
+        combined.eta = walkToTrain.eta + trainToTrain.eta + walkFromTrain.eta;
+        combined.distance = walkToTrain.distance + trainToTrain.distance + walkFromTrain.distance;
+
+        combined.path.addAll(walkToTrain.path);
+        combined.path.addAll(trainToTrain.path);
+        combined.path.addAll(walkFromTrain.path);
+
+        return combined;
     }
 
     public void setPreferTrains(boolean preferTrains) {
@@ -411,25 +441,29 @@ public class MapController {
     }
 
     public interface PathEvent {
-        public void execute(int x0, int y0, int x1, int y1);
+        void execute(int x0, int y0, int x1, int y1);
     }
 
     public void forEachPathPoint(PathEvent e) {
         if(uiState == UIState.SHOW_PATH) {
-            for(int i = 0; i < routePath.size() - 1; i++) {
-                int x0 = worldToPixelX(routePath.get(i).x);
-                int y0 = worldToPixelY(routePath.get(i).y);
-                int x1 = worldToPixelX(routePath.get(i + 1).x);
-                int y1 = worldToPixelY(routePath.get(i + 1).y);
+            for(int i = 0; i < currentRoute.path.size() - 1; i++) {
+                int x0 = worldToPixelX(currentRoute.path.get(i).x);
+                int y0 = worldToPixelY(currentRoute.path.get(i).y);
+
+                int x1 = worldToPixelX(currentRoute.path.get(i + 1).x);
+                int y1 = worldToPixelY(currentRoute.path.get(i + 1).y);
+
                 e.execute(x0, y0, x1, y1);
             }
         }
     }
 
     public int getAttractionWaitTime(MapAttraction attraction) throws IOException, InterruptedException {
-        boolean isTrainStation = attraction.getAttractionID() < -1 && attraction.getAttractionID() >= -1 - NUM_TRAIN_STATIONS;
+        boolean isTrainStation = attraction.getAttractionID() < -1
+            && attraction.getAttractionID() >= -1 - NUM_TRAIN_STATIONS;
 
-        return isTrainStation ? getTrainWaitTime() : adaptor.getWaitTime(attraction.getLandID(), attraction.getAttractionID());
+        return isTrainStation ? getTrainWaitTime()
+            : adaptor.getWaitTime(attraction.getLandID(), attraction.getAttractionID());
     }
 
     public int getTrainWaitTime() throws IOException, InterruptedException {
