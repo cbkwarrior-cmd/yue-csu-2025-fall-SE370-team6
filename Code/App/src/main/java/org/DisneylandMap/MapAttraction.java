@@ -1,6 +1,8 @@
 package org.DisneylandMap;
 
 public class MapAttraction extends MapNode {
+    // If a node stored in the nodes file has an attraction ID of ATTRACTION_ID_INVALID, then it is not an attraction.
+    // If it is < ATTRACTION_ID_INVALID, then it is a train station.
     public static final int ATTRACTION_ID_INVALID = -1;
 
     private String name;

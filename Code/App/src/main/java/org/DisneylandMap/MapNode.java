@@ -2,7 +2,10 @@ package org.DisneylandMap;
 
 import java.util.ArrayList;
 
+// Simple object to represent nodes that make up generated paths.
+// Can be simple points along pathways.
 public class MapNode {
+    // Constants correspond with ID's present in nodes file
     public static final int CONNECTION_TYPE_WALKWAY = 0;
     public static final int CONNECTION_TYPE_TRAIN = 1;
     public static final int CONNECTION_TYPE_PARADE = 2;

@@ -14,8 +14,11 @@ public class Map {
     private ArrayList<MapNode> nodes = new ArrayList<>();
     private BufferedImage mapImage;
 
+    // Helper for efficiently accessing non-intermediary attraction nodes
     private HashMap<Integer, Integer> attractionsTable = new HashMap<>();
 
+    // Constructor parses both the map image and map nodes files
+    // Populates attractionsTable as well as initializes it.
     public Map(String mapImagePath, String mapNodesPath) {
         try {
             this.mapImage = ImageIO.read(new File(mapImagePath));
@@ -60,6 +63,7 @@ public class Map {
         }
     }
 
+    // Uses attractionsTable to specifically iterate over attraction nodes, not path nodes.
     public void forEachAttraction(BiConsumer<Integer, MapAttraction> action) {
         for(java.util.Map.Entry<Integer, Integer> e : attractionsTable.entrySet()) {
             action.accept(e.getKey(), (MapAttraction)nodes.get(e.getValue()));

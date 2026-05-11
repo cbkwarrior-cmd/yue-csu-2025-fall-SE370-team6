@@ -15,15 +15,18 @@ import java.awt.image.BufferedImage;
 import javax.swing.SwingUtilities;
 
 public class MapController {
+    // Error codes for getWaitTime
     private static final int WAIT_TIME_CLOSED = -1;
     private static final int WAIT_TIME_FAILED = -2;
 
     private final String MAP_IMAGE_PATH = "map.jpeg";
     private final String MAP_NODES_PATH = "nodes.txt";
 
+    // Average speeds sourced from Google
     private final double STEPS_PER_METER = 1.31;
     private final double STEPS_PER_SECOND = 1.5;
 
+    // Parade times sourced from the Disneyland website
     private final LocalTime PARADE_WEEKDAY_START = LocalTime.of(20, 30);
     private final LocalTime PARADE_WEEKDAY_END = LocalTime.of(21, 10);
 
@@ -31,29 +34,13 @@ public class MapController {
     private final LocalTime PARADE_WEEKEND_END = LocalTime.of(23, 10);
 
     private final int NUM_TRAIN_STATIONS = 4;
+    // Corresponds to the only train station entry in QueueTimes
     private final int TRAIN_STATION_LAND_ID = 113;
     private final int TRAIN_STATION_ATTRACTION_ID = 674;
 
+    // Member objects
     private IQueueTime adaptor;
     private Map map;
-
-    private Route currentRoute = new Route();
-    private boolean preferTrains;
-
-    private double cameraX = 0, cameraY = 0;
-    private double scale = 1.0;
-
-    private int mouseX, mouseY;
-    private double dragXStart, dragYStart;
-    private boolean dragging = false;
-
-    private enum UIState {
-        NAVIGATE,
-        SELECT_POINT_B,
-        SHOW_PATH,
-    }
-    private UIState uiState = UIState.NAVIGATE;
-    private int highlightedAttractionID;
 
     private static class Route {
         int eta;
@@ -65,28 +52,51 @@ public class MapController {
         }
     }
 
+    private Route currentRoute = new Route();
+    private boolean preferTrains;
+
+    // For transforming the on-screen map, nodes, and path
+    private double cameraX = 0, cameraY = 0;
+    private double mapScale = 1.0;
+
+    private int mouseX, mouseY;
+    private double dragXStart, dragYStart;
+    private boolean dragging = false;
+
+    // UI state corresponds to each stage of the route-creation pipeline.
+    // Ties into visuals as well.
+    private enum UIState {
+        NAVIGATE,
+        SELECT_POINT_B,
+        SHOW_PATH,
+    }
+    private UIState uiState = UIState.NAVIGATE;
+    private int highlightedAttractionID;
+
     public MapController(MapView view) {
         this.adaptor = new QueueTimesAdaptor();
         this.map = new Map(MAP_IMAGE_PATH, MAP_NODES_PATH);
         unhighlightAttraction(view);
     }
 
+    // Helper methods for conversions between on-screen pixel coordinates and normalized "map space" which the nodes' coordinates are in.
     public int worldToPixelX(double x) {
-        return MapView.MAP_X + (int)((x + .5 - cameraX) * MapView.MAP_WIDTH * scale);
+        return MapView.MAP_X + (int)((x + .5 - cameraX) * MapView.MAP_WIDTH * mapScale);
     }
 
     public int worldToPixelY(double y) {
-        return MapView.MAP_Y + (int)((y + .5 - cameraY) * MapView.MAP_HEIGHT * scale);
+        return MapView.MAP_Y + (int)((y + .5 - cameraY) * MapView.MAP_HEIGHT * mapScale);
     }
 
     private double pixelToWorldX(int x) {
-        return cameraX + ((double)(x - MapView.MAP_X) / MapView.MAP_WIDTH - .5) / scale;
+        return cameraX + ((double)(x - MapView.MAP_X) / MapView.MAP_WIDTH - .5) / mapScale;
     }
 
     private double pixelToWorldY(int y) {
-        return cameraY + ((double)(y - MapView.MAP_Y) / MapView.MAP_HEIGHT - .5) / scale;
+        return cameraY + ((double)(y - MapView.MAP_Y) / MapView.MAP_HEIGHT - .5) / mapScale;
     }
 
+    // Selects attraction node, displays information on information panel, and updates UI state
     private void highlightAttraction(int id, MapView view) {
         this.highlightedAttractionID = id;
 
@@ -106,7 +116,7 @@ public class MapController {
                 info += "Wait Time: " + waitTimeMinutes + " Minutes.";
             }
 
-            view.setAttractionInfo(info);
+            view.updateAttractionInfo(info);
         } catch(IOException | InterruptedException e) {
             e.printStackTrace();
         }
@@ -117,7 +127,7 @@ public class MapController {
     public void unhighlightAttraction(MapView view) {
         this.highlightedAttractionID = MapAttraction.ATTRACTION_ID_INVALID;
 
-        view.setAttractionInfo("Press Node to View Attraction Info");
+        view.updateAttractionInfo("Press Node to View Attraction Info");
         setUiState(uiState, view);
     }
 
@@ -125,6 +135,7 @@ public class MapController {
         void execute(int pixelX, int pixelY, int id, String name, boolean highlighted);
     }
 
+    // Helper function to iterate through each attraction and operate with additional data, such as pixel coordinates
     public void forEachAttraction(MapView view, AttractionEvent e) {
         map.forEachAttraction((id, attraction) -> {
 
@@ -141,6 +152,8 @@ public class MapController {
         });
     }
 
+    // Returns string which details the ETA of currentRoute in a human-readable format
+    // Will be in seconds if < 1 minute, minutes if < 1 hour, or minutes + hours if >= 1 hour
     private String formatETA() {
         String etaText = "";
         int etaMinutes = currentRoute.eta / 60;
@@ -162,6 +175,8 @@ public class MapController {
         return etaText;
     }
 
+    // Updates uiState alongside visuals for UI elements, in one function.
+    // Uses formatETA() when the path is visible.
     private void setUiState(UIState newState, MapView view) {
         this.uiState = newState;
 
@@ -195,6 +210,7 @@ public class MapController {
         }
     }
 
+    // Behavior for MapView's route button can modify UI state.
     public void handleRouteButton(MapView view) {
         switch(uiState) {
             case NAVIGATE -> {
@@ -212,6 +228,9 @@ public class MapController {
         view.repaint();
     }
 
+    // Behavior for clicking on attraction.
+    // Also excuted by MapView's list of buttons.
+    // Can execute pathfinding if the state is SELECT_POINT_B.
     public void handleAttractionClick(MapView view, int id) {
         if(uiState == UIState.SELECT_POINT_B && highlightedAttractionID != id) {
             currentRoute = preferTrains
@@ -227,6 +246,8 @@ public class MapController {
         view.repaint();
     }
 
+    // Event that get calls by MapView
+    // Handles dragging of the map and collision detection for attraction nodes.
     public void handleMousePress(MouseEvent e, MapView view) {
         if(SwingUtilities.isRightMouseButton(e)
             && e.getX() >= MapView.MAP_X
@@ -242,7 +263,7 @@ public class MapController {
                 unhighlightAttraction(view);
             }
 
-            double radius = MapView.ATTRACTION_RADIUS * scale;
+            double radius = MapView.ATTRACTION_RADIUS * mapScale;
 
             forEachAttraction(view, (x, y, id, name, highlighted) -> {
                 double dx = mouseX - x;
@@ -257,13 +278,15 @@ public class MapController {
         view.repaint();
     }
 
+    // Event called in MapView
     public void handleMouseRelease() {
         dragging = false;
     }
 
+    // Event called in MapView
     public void handleMouseDrag(MapView view) {
         if(dragging) {
-            double bounds = -1.0 / (scale * 2.0);
+            double bounds = -1.0 / (mapScale * 2.0);
 
             cameraX = Math.clamp(dragXStart + cameraX - pixelToWorldX(mouseX), bounds, (1.0 + bounds));
             cameraY = Math.clamp(dragYStart + cameraY - pixelToWorldY(mouseY), bounds, (1.0 + bounds));
@@ -272,28 +295,31 @@ public class MapController {
         view.repaint();
     }
 
+    // Event called in MapView
     public void handleMouseMove(MouseEvent e) {
         mouseX = e.getX();
         mouseY = e.getY();
     }
 
+    // Event called in MapView
+    // The map scale cannnot exceed upper and lower limits present below.
     public void handleMouseWheelMove(MouseWheelEvent e, MapView view) {
         if(e.getWheelRotation() > 0) {
-            if(scale >= 2) {
-                cameraX -= .5 / scale;
-                cameraY -= .5 / scale;
-                scale *= .5;
+            if(mapScale >= 2) {
+                cameraX -= .5 / mapScale;
+                cameraY -= .5 / mapScale;
+                mapScale *= .5;
             }
         }
         else {
-            if(scale <= 4) {
-                scale *= 2;
-                cameraX += .5 / scale;
-                cameraY += .5 / scale;
+            if(mapScale <= 4) {
+                mapScale *= 2;
+                cameraX += .5 / mapScale;
+                cameraY += .5 / mapScale;
             }
         }
 
-        double bounds = -1.0 / (scale * 2.0);
+        double bounds = -1.0 / (mapScale * 2.0);
 
         cameraX = Math.clamp(cameraX, bounds, (1.0 + bounds));
         cameraY = Math.clamp(cameraY, bounds, (1.0 + bounds));
@@ -301,6 +327,10 @@ public class MapController {
         view.repaint();
     }
 
+    // Modified version of Dijkstra's pathfinding algorithm.
+    // Ranks paths based off of ETA and calculates ETA based off of path type.
+    // Blocks paths depending on time-of-day and if it's a parade route.
+    // Implementation of Dijkstra's algorithm was derived off of pseudocode from: https://en.wikipedia.org/wiki/Dijkstra's_algorithm
     public Route findPath(int startID, int endID, int[] excludedPathTypes) {
         Route result = new Route();
 
@@ -409,6 +439,7 @@ public class MapController {
         return result;
     }
 
+    // Used in prefer trains mode. Finds three paths using findPath, then stitches them together.
     public Route findTrainPath(int startAttractionID, int endAttractionID) {
         int startTrain = map.getAttractionFromID(startAttractionID).getClosestTrainID();
         int endTrain = map.getAttractionFromID(endAttractionID).getClosestTrainID();
@@ -442,6 +473,7 @@ public class MapController {
         void execute(int x0, int y0, int x1, int y1);
     }
 
+    // Similarly to forEachAttraction, converts line edge coordinates to pixel space.
     public void forEachPathPoint(PathEvent e) {
         if(uiState == UIState.SHOW_PATH) {
             for(int i = 0; i < currentRoute.path.size() - 1; i++) {
@@ -456,6 +488,7 @@ public class MapController {
         }
     }
 
+    // Calls adaptor's getWaitTime() and expects a result in seconds.
     public int getAttractionWaitTime(MapAttraction attraction) throws IOException, InterruptedException {
         boolean isTrainStation = attraction.getAttractionID() < MapAttraction.ATTRACTION_ID_INVALID
             && attraction.getAttractionID() >= MapAttraction.ATTRACTION_ID_INVALID - NUM_TRAIN_STATIONS;
@@ -473,6 +506,6 @@ public class MapController {
     }
 
     public double getMapScale() {
-        return scale;
+        return mapScale;
     }
 }
