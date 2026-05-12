@@ -202,6 +202,10 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         attractionInfoPanel.setBackground(GREY_RGB);
         this.add(attractionInfoPanel);
 
+<<<<<<< Updated upstream
+=======
+        // Mandatory api link label that Queue-Times.com requires of us to include. Opens link to their site
+>>>>>>> Stashed changes
         JButton apiLinkButton = new JButton("Powered by Queue-Times.com");
         apiLinkButton.setContentAreaFilled(false);
         apiLinkButton.setBorderPainted(false);
@@ -233,6 +237,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         controller.unhighlightAttraction(this);
     }
 
+<<<<<<< Updated upstream
     public void setAttractionInfo(String text) {
         attractionInfoLabel.setText(text);
         attractionInfoLabel.setCaretPosition(0);
@@ -242,6 +247,9 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         return ATTRACTION_RADIUS;
     }
 
+=======
+    // main function of the app
+>>>>>>> Stashed changes
     public static void main(String[] args) {
         MapView mapView = new MapView();
         mapView.startView();

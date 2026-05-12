@@ -8,7 +8,12 @@ public class MapAttraction extends MapNode {
     private String name;
     private int attractionID, landID;
 
+<<<<<<< Updated upstream
     public MapAttraction(String name, int attractionID, int landID, double x, double y) {
+=======
+    // Constructor for class MapAttraction
+    public MapAttraction(String name, int attractionID, int closestTrainID, int landID, double x, double y) {
+>>>>>>> Stashed changes
         super(x, y);
         this.name = name;
         this.attractionID = attractionID;

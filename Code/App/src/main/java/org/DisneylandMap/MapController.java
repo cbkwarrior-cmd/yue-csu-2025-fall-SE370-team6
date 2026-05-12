@@ -384,7 +384,7 @@ public class MapController {
 
         return isTrainStation ? getTrainWaitTime() : adaptor.getWaitTime(attraction.getLandID(), attraction.getAttractionID());
     }
-
+    
     public int getTrainWaitTime() throws IOException, InterruptedException {
         return adaptor.getWaitTime(TRAIN_STATION_LAND_ID, TRAIN_STATION_ATTRACTION_ID);
     }
