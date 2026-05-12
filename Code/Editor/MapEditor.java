@@ -34,6 +34,30 @@ import javax.swing.JPanel;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 
+// This program was solely used as a developer app to help plot out the park map since placing each node manually would be unfeasible.
+// This is not part of the app itself.
+// It's designed to be easy to use, but there are bugs that exist, so it isn't stable.
+// We also didn't integrate it carefully with the app.
+// There is code that's been derived from the actual app's, but it's been modified from the original source code.
+// Due to the lack of significance treated to this, the code is admittedly unclean in places, but it still served us very well.
+// The file allows us to place attractions with names and relevant ID's, as well as draw paths of different connection types.
+//
+// ------------------------------CONTROLS------------------------------
+// Keys 1-4 change the placement mode
+//      1: Attraction Place
+//      2: Walkway Draw
+//      3: Train Draw
+//      4: Parade Draw
+// When in Attraction Place mode, you simply left click, edit the data text boxes show up, then click the button to place the node.
+// All of the "Draw" modes are used to plot pathways. You simply choose a start node, then click empty space to place an intermediary mode, then an end point.
+// Each time an intermediary is placed, a path is drawn from the last node selected or placed to the newly placed one.
+//
+// The Z key undoes the previous action. There is no delete feature.
+// The S key writes the map data in the editor to the nodes file
+//
+// If the editor locates the nodes file, it will load the data into the editor. If not, it'll simply load nothing into the editor.
+//
+// Data can be manually edited in the nodes file, but caution should be taken if one were to do so.
 public class MapEditor extends JPanel implements MouseListener, MouseMotionListener, MouseWheelListener, KeyListener {
     final Dimension DISPLAY_DIMENSIONS = Toolkit.getDefaultToolkit().getScreenSize();
     final int WINDOW_HEIGHT = (int) DISPLAY_DIMENSIONS.getHeight() - 50;
@@ -62,6 +86,7 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
 
     static int connectionType = CONNECTION_TYPE_WALKWAY;
 
+    // Node class corresponds with node data found in text file
     private class Node {
         public int attractionID;
         public int landID;
@@ -254,7 +279,11 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
             case KeyEvent.VK_S: {
                 try {
                     FileWriter wr = new FileWriter(NODES_FILE_NAME, false);
-                    for (Node node : nodes) {
+                    for(int i = 0; i < nodes.size(); i++) {
+                        Node node = nodes.get(i);
+
+                        node.closestTrainID = node.attractionID == -1 ? -1 : closestTrainToAttraction(i);
+
                         wr.write("n:\n");
                         wr.write(node.name + "\n");
                         wr.write("" + node.attractionID + "\n");
@@ -331,6 +360,7 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
         }
     }
 
+    // Used Dijkstra's algorithm, sourced from the same Wikipedia pseudocode as the app's implementation.
     public double distanceToNode(int startIndex, int endIndex) {
         double[] dist = new double[nodes.size()];
         int[] prev = new int[nodes.size()];
@@ -526,11 +556,6 @@ public class MapEditor extends JPanel implements MouseListener, MouseMotionListe
         }
         catch(IOException ex) {
             System.out.println("Missing nodes.txt, assuming empty");
-        }
-
-        for(int i = 0; i < nodes.size(); i++) {
-            if(nodes.get(i).attractionID <= -1) { continue; }
-            nodes.get(i).closestTrainID = closestTrainToAttraction(i);
         }
 
         this.setFocusable(true);
