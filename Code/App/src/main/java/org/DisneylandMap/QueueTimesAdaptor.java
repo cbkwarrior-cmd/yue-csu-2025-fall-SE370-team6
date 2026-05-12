@@ -1,4 +1,4 @@
-package org.DisneylandMap;
+package src.main.java.org.DisneylandMap;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,6 +11,8 @@ import java.net.http.HttpResponse.BodyHandlers;
 
 import java.io.IOException;
 
+// Adaptor for the Queue-Times API. It requests, receives, and parses through a JSON of current attraction
+//data of the park from Queue-Time.com
 public class QueueTimesAdaptor implements IQueueTime {
 
     //Disneyland California has the id '16' in Queue-Times API
@@ -32,7 +34,9 @@ public class QueueTimesAdaptor implements IQueueTime {
     }
 
     //Returns the current wait time of the attraction using the current data that is retrieved from Queue-Times API,
-    //or it returns -1 if the attraction is closed, or -2 if an error has occurred
+    //or it returns -1 if the attraction is closed, or -2 if an error has occurred. The parameter 'landID' indicates
+    //the land in which the desired attraction is from, and the parameter 'attractionID' indicates the desired attraction
+    //that the method will return the wait time from
     public int getWaitTime(int landID, int attractionID) throws IOException, InterruptedException {
 
         //Sends and gets a httpResponse from Queue-Times API
@@ -45,23 +49,6 @@ public class QueueTimesAdaptor implements IQueueTime {
             e.printStackTrace();
             return -2;
         }
-
-
-
-
-
-        //Debugging httpResponse
-        //HttpResponse<String> httpResponseExp = httpClient.send(httpRequest, BodyHandlers.ofString());
-
-        //Degugging output to get names of attractions in Queue-Times API
-        //System.out.println(httpResponseExp.body());
-
-        //Other debugging outputs
-        //System.out.println("Status Code: " + httpResponseExp.statusCode());
-        //System.out.println(httpResponseExp.headers());
-
-
-
 
         JsonNode rootNode = objectMapper.readTree(httpResponse.body());
         JsonNode lands = rootNode.path("lands");

@@ -1,4 +1,4 @@
-package org.DisneylandMap;
+package src.main.java.org.DisneylandMap;
 
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;

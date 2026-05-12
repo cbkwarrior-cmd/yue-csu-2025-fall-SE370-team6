@@ -1,4 +1,4 @@
-package org.DisneylandMap;
+package src.main.java.org.DisneylandMap;
 
 import java.io.IOException;
 import java.time.DayOfWeek;

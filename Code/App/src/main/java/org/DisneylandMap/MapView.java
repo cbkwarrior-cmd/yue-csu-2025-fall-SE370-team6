@@ -1,4 +1,4 @@
-package org.DisneylandMap;
+package src.main.java.org.DisneylandMap;
 
 import java.awt.BasicStroke;
 import java.awt.BorderLayout;
@@ -197,6 +197,7 @@ public class MapView extends JPanel implements MouseListener, MouseMotionListene
         });
 
         JScrollPane attractionsScrollPane = new JScrollPane(attractionsButtonPanel, JScrollPane.VERTICAL_SCROLLBAR_ALWAYS, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        attractionsScrollPane.getVerticalScrollBar().setUnitIncrement(20);
         attractionsPanel.add(attractionsScrollPane, BorderLayout.CENTER);
         this.add(attractionsPanel);
 
