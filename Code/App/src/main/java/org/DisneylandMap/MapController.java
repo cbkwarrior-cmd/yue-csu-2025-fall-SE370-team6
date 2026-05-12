@@ -449,7 +449,7 @@ public class MapController {
         Route walkToTrain = findPath(startAttractionID, startTrain, new int[]{MapNode.CONNECTION_TYPE_TRAIN});
         if(!walkToTrain.exists()) { return combined; }
 
-        Route trainToTrain = findPath(startTrain, endTrain, new int[]{MapNode.CONNECTION_TYPE_TRAIN});
+        Route trainToTrain = findPath(startTrain, endTrain, new int[]{MapNode.CONNECTION_TYPE_WALKWAY, MapNode.CONNECTION_TYPE_PARADE});
         if(!trainToTrain.exists()) { return combined; }
 
         Route walkFromTrain = findPath(endTrain, endAttractionID, new int[]{MapNode.CONNECTION_TYPE_TRAIN});
