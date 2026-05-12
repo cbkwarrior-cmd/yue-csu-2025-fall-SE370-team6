@@ -1,4 +1,4 @@
-package src.main.java.org.DisneylandMap;
+package org.DisneylandMap;
 
 public class MapAttraction extends MapNode {
     // If a node stored in the nodes file has an attraction ID of ATTRACTION_ID_INVALID, then it is not an attraction.

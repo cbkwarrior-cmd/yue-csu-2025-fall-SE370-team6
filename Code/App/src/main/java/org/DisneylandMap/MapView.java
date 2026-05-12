@@ -1,4 +1,4 @@
-package src.main.java.org.DisneylandMap;
+package org.DisneylandMap;
 
 import java.awt.BasicStroke;
 import java.awt.BorderLayout;

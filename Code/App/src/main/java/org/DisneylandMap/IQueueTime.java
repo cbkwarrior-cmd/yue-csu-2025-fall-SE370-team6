@@ -1,4 +1,4 @@
-package src.main.java.org.DisneylandMap;
+package org.DisneylandMap;
 
 import java.io.IOException;
 

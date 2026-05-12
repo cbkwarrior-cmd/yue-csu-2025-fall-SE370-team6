@@ -1,4 +1,4 @@
-package src.main.java.org.DisneylandMap;
+package org.DisneylandMap;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
