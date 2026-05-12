@@ -33,7 +33,6 @@ public class MapController {
     private final LocalTime PARADE_WEEKEND_START = LocalTime.of(22, 30);
     private final LocalTime PARADE_WEEKEND_END = LocalTime.of(23, 10);
 
-    private final int NUM_TRAIN_STATIONS = 4;
     // Corresponds to the only train station entry in QueueTimes
     private final int TRAIN_STATION_LAND_ID = 113;
     private final int TRAIN_STATION_ATTRACTION_ID = 674;
@@ -441,19 +440,28 @@ public class MapController {
 
     // Used in prefer trains mode. Finds three paths using findPath, then stitches them together.
     public Route findTrainPath(int startAttractionID, int endAttractionID) {
-        int startTrain = map.getAttractionFromID(startAttractionID).getClosestTrainID();
-        int endTrain = map.getAttractionFromID(endAttractionID).getClosestTrainID();
+        MapAttraction startAttraction = map.getAttractionFromID(startAttractionID);
+        MapAttraction endAttraction = map.getAttractionFromID(endAttractionID);
+
+        int startTrainID = startAttraction.isTrainStation() ? startAttractionID : startAttraction.getClosestTrainID();
+        int endTrainID = endAttraction.isTrainStation() ? endAttractionID : endAttraction.getClosestTrainID();
 
         Route combined = new Route();
 
-        Route walkToTrain = findPath(startAttractionID, startTrain, new int[]{MapNode.CONNECTION_TYPE_TRAIN});
-        if(!walkToTrain.exists()) { return combined; }
+        Route walkToTrain = new Route();
+        if(!startAttraction.isTrainStation()) {
+            walkToTrain = findPath(startAttractionID, startTrainID, new int[]{MapNode.CONNECTION_TYPE_TRAIN});
+            if(!walkToTrain.exists()) { return combined; }
+        }
 
-        Route trainToTrain = findPath(startTrain, endTrain, new int[]{MapNode.CONNECTION_TYPE_WALKWAY, MapNode.CONNECTION_TYPE_PARADE});
+        Route trainToTrain = findPath(startTrainID, endTrainID, new int[]{MapNode.CONNECTION_TYPE_WALKWAY, MapNode.CONNECTION_TYPE_PARADE});
         if(!trainToTrain.exists()) { return combined; }
 
-        Route walkFromTrain = findPath(endTrain, endAttractionID, new int[]{MapNode.CONNECTION_TYPE_TRAIN});
-        if(!walkFromTrain.exists()) { return combined; }
+        Route walkFromTrain = new Route();
+        if(!endAttraction.isTrainStation()) {
+            walkFromTrain = endAttraction.isTrainStation() ? new Route() : findPath(endTrainID, endAttractionID, new int[]{MapNode.CONNECTION_TYPE_TRAIN});
+            if(!walkFromTrain.exists()) { return combined; }
+        }
 
         combined.eta = walkToTrain.eta + trainToTrain.eta + walkFromTrain.eta;
         combined.distance = walkToTrain.distance + trainToTrain.distance + walkFromTrain.distance;
@@ -490,10 +498,7 @@ public class MapController {
 
     // Calls adaptor's getWaitTime() and expects a result in seconds.
     public int getAttractionWaitTime(MapAttraction attraction) throws IOException, InterruptedException {
-        boolean isTrainStation = attraction.getAttractionID() < MapAttraction.ATTRACTION_ID_INVALID
-            && attraction.getAttractionID() >= MapAttraction.ATTRACTION_ID_INVALID - NUM_TRAIN_STATIONS;
-
-        return isTrainStation ? getTrainWaitTime()
+        return attraction.isTrainStation() ? getTrainWaitTime()
             : adaptor.getWaitTime(attraction.getLandID(), attraction.getAttractionID());
     }
 

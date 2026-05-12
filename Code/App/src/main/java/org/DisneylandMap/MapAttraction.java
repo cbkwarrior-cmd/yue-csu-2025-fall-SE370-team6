@@ -32,4 +32,9 @@ public class MapAttraction extends MapNode {
     public int getClosestTrainID() {
         return closestTrainID;
     }
+
+    public boolean isTrainStation() {
+        return attractionID < ATTRACTION_ID_INVALID && attractionID >= ATTRACTION_ID_INVALID - Map.NUM_TRAIN_STATIONS;
+    }
+
 }

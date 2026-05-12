@@ -11,6 +11,8 @@ import java.util.function.BiConsumer;
 import javax.imageio.ImageIO;
 
 public class Map {
+    public static final int NUM_TRAIN_STATIONS = 4;
+
     private ArrayList<MapNode> nodes = new ArrayList<>();
     private BufferedImage mapImage;
 
